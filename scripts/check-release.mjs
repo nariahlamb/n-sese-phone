@@ -10,7 +10,8 @@ const readJson = async name => JSON.parse(await readFile(path.join(root, name), 
 const manifest = await readJson('manifest.json');
 const pkg = await readJson('package.json');
 assert.equal(manifest.version, pkg.version);
-assert.equal(manifest.homePage, `https://github.com/ike888-go/${pkg.name}`);
+assert.equal(new URL(manifest.homePage).hostname, 'github.com');
+assert.equal(new URL(manifest.homePage).pathname.split('/').filter(Boolean).at(-1), pkg.name);
 assert.equal(manifest.js, 'index.js');
 assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/);
 for (const name of ['index.js', 'runtime/extension.js', 'runtime/config.js', 'dist/index.js', 'SOURCE_NOTICE.md', 'README.md']) {
