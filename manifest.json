@@ -2,9 +2,9 @@
   "display_name": "瑟瑟小手机",
   "loading_order": 220,
   "js": "index.js",
-  "author": "原作者 / 雾港（安装适配）",
-  "version": "0.1.0-alpha.1",
-  "homePage": "https://github.com/ike888-go/sese-phone",
+  "author": "Original author / MistHarbor (installation adaptation)",
+  "version": "0.1.0-alpha.2",
+  "homePage": "https://github.com/MistHarbor-Lab/sese-phone",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
