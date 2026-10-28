@@ -1,0 +1,10 @@
+{
+  "display_name": "小手机 · 独立安装版",
+  "loading_order": 220,
+  "js": "index.js",
+  "author": "源码版权归原作者；安装适配维护：ike888-go",
+  "version": "0.1.0-alpha.1",
+  "homePage": "https://github.com/ike888-go/sese-phone",
+  "auto_update": true,
+  "minimum_client_version": "1.13.0"
+}
