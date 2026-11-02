@@ -3284,8 +3284,8 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px rgba(217, 180, 92, 0.26), inset 0 0 0 4px rgba(217, 180, 92, 0.07);
 }
 .ubp-skin-xianxia .ubp-ball {
-  background: linear-gradient(160deg, #1A2B25, #101D18);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 0 0 1.5px rgba(217, 180, 92, 0.4);
+  /* 材质已收进独立球面；48px 外框不铺第二层底，贴边时不会留下偏心底盘。 */
+  background: transparent; box-shadow: none;
 }
 .ubp-skin-xianxia .ubp-notch { background: #0A120F; box-shadow: inset 0 0 0 1px rgba(217, 180, 92, 0.22); }
 .ubp-skin-xianxia .ubp-screen {
@@ -3530,8 +3530,7 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px #171310, inset 0 0 0 4px #B08A4F, inset 0 0 0 5px rgba(92, 69, 31, 0.9);
 }
 .ubp-skin-wuxia .ubp-ball {
-  background: linear-gradient(160deg, #4A3A22, #241A0E);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 0 0 1.5px rgba(201, 164, 92, 0.5);
+  background: transparent; box-shadow: none;
 }
 .ubp-skin-wuxia .ubp-notch { background: #171310; box-shadow: inset 0 0 0 1px rgba(201, 164, 92, 0.4); }
 .ubp-skin-wuxia .ubp-screen { background: var(--ubp-bg); }
@@ -3767,8 +3766,7 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px #0E0B07, inset 0 0 0 4px #A8842C, inset 0 0 0 5px #4A3618;
 }
 .ubp-skin-fantasy .ubp-ball {
-  background: radial-gradient(circle at 34% 30%, rgba(157, 180, 232, 0.5), rgba(78, 95, 168, 0.35) 55%, #1A1424 90%);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 10px rgba(124, 154, 232, 0.35), inset 0 0 0 1.5px rgba(200, 155, 75, 0.5);
+  background: transparent; box-shadow: none;
 }
 .ubp-skin-fantasy .ubp-notch { background: #0C0906; box-shadow: inset 0 0 0 1px rgba(200, 155, 75, 0.5); }
 .ubp-skin-fantasy .ubp-notch::after {
@@ -4049,12 +4047,10 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px rgba(255, 143, 171, 0.22), inset 0 0 0 4px rgba(255, 143, 171, 0.08);
 }
 .ubp-theme-sweet .ubp-ball {
-  background: linear-gradient(170deg, #FFD9E6, #F5BCD0); color: #C25E7E;
-  box-shadow: 0 4px 14px rgba(214, 130, 160, 0.45), inset 0 0 0 1.5px rgba(255, 255, 255, 0.6);
+  background: transparent; color: #C25E7E; box-shadow: none;
 }
 .ubp-theme-sweet.ubp-dark .ubp-ball {
-  background: linear-gradient(170deg, #3A2A3E, #2A1E2E); color: #FFB3C8;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 0 0 1.5px rgba(255, 143, 171, 0.35);
+  background: transparent; color: #FFB3C8; box-shadow: none;
 }
 .ubp-theme-sweet .ubp-notch { background: #EBABBF; }
 .ubp-theme-sweet.ubp-dark .ubp-notch { background: #171017; box-shadow: inset 0 0 0 1px rgba(255, 143, 171, 0.18); }
@@ -4173,8 +4169,7 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px rgba(255, 137, 179, 0.2), 0 0 24px rgba(208, 96, 160, 0.12);
 }
 .ubp-theme-flirty .ubp-ball {
-  background: linear-gradient(165deg, #33243C, #221830); color: #FF9FBE;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 0 0 1.5px rgba(255, 137, 179, 0.4);
+  background: transparent; color: #FF9FBE; box-shadow: none;
 }
 .ubp-theme-flirty .ubp-notch { background: #120D17; box-shadow: inset 0 0 0 1px rgba(255, 137, 179, 0.16); }
 .ubp-theme-flirty .ubp-homebar-pill { background: var(--ubp-accent); opacity: 0.42; }

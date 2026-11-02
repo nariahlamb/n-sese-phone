@@ -155,7 +155,7 @@
     "src/UBS_phone/renderers/storage-manager-sheet.ts": "37cc585d5f61c4fac5fabd51e89dbfd6405fb111d925cb2393162de0435239d0",
     "src/UBS_phone/renderers/story-link-enhance.ts": "1a4c876ede1bdc2a927c91ffd0efb91226caf84d7145aba712893096eb7bccbd",
     "src/UBS_phone/renderers/voice-meta.ts": "23ed779ac7184200bf69821d41a12927884714939ba0401cfe35f866f9679268",
-    "src/UBS_phone/styles/phone-theme.ts": "e9b8a2de455273ad639c5d64deee413b8857e35de86388115bc567f498063666",
+    "src/UBS_phone/styles/phone-theme.ts": "d895d68e71c9346a59558b3ee9eea4a90f50b3b0c0fe6e15ad34060c90089953",
     "src/unified-statusbar/core/ai-activity.ts": "bd911f3e82bcd07d70473d295ab332b36322756133cd1d2a3a68827b56346902",
     "src/unified-statusbar/core/ai-parse.ts": "eb998bcfa59ffb9e69cc2eadc9edda8bd80c487d048419e2306c20d4d46039a0",
     "src/unified-statusbar/core/ai-prompt-macros.ts": "228fd2111d369ec32abf48b3a5c36350b7cf438e65c6ae178ed552d48db8a1ca",

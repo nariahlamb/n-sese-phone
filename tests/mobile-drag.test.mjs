@@ -136,6 +136,13 @@ test('手机挂载：环境标记、主题 RGBA、48px 外框与静态角标；�
     assert.equal(win.document.documentElement.getAttribute('data-ubp-mobile-lite'), '1');
     assert.equal(ball.style.getPropertyValue('--ubp-ball-rgb'), '16,16,19');
     assert(shadow.querySelector('.ubp-ball-face'));
+    const css = shadow.querySelector('style').textContent;
+    const outerBallRules = css.match(/\.ubp-(?:skin|theme)-[^{]*\.ubp-ball\s*\{[^}]*\}/g) || [];
+    assert(outerBallRules.length >= 6, '内置皮肤的球外框规则必须全部纳入去底盘检查');
+    for (const rule of outerBallRules) {
+      assert(rule.includes('background: transparent'), `外框仍铺背景：${rule}`);
+      assert(rule.includes('box-shadow: none'), `外框仍有偏心阴影：${rule}`);
+    }
     for (const cls of ['ubp-ball-dot', 'ubp-ball-ai', 'ubp-ball-game']) assert(shadow.querySelector('.' + cls));
     assert.equal(ball.getAttribute('role'), 'button');
     // 真实 mountPhone 绑定的球：拖到右缘后仍存旧格式，残留 click 不会打开手机。
