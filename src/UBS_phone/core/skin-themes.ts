@@ -455,6 +455,13 @@ export function phoneSkinCss(def: PhoneSkinDef): string {
   }
   // 自定义 CSS：末尾追加（同特异性下最后生效）；已过 saneCustomCss 黑名单清洗
   if (def.css) parts.push(def.css);
+  // 悬浮球的触控/主题收口必须由本插件最后保证：自定义 CSS 可能覆盖基础球面。
+  // 只管理球视觉面，不覆盖皮肤 token、机身、角标颜色或用户自定义 CSS 的其他选择器。
+  parts.push(`${CUSTOM} .ubp-ball{background:transparent;box-shadow:none;transition:none}`);
+  parts.push(`${CUSTOM} .ubp-ball .ubp-ball-face{background:rgba(var(--ubp-ball-rgb,16,16,19),.68);box-shadow:0 1px 3px rgba(0,0,0,.12);color:#CFF5E0;border:1px solid rgba(var(--ubp-ball-rgb,16,16,19),.48)}`);
+  parts.push(`${CUSTOM}.ubp-mobile-lite .ubp-ball .ubp-ball-face{width:32px;height:32px}`);
+  parts.push(`:host-context(html[data-ubp-mobile-lite="1"]) .ubp-ball .ubp-ball-face{width:32px;height:32px}`);
+  parts.push(`${CUSTOM}.ubp-mobile-lite .ubp-ball.ubp-ring .ubp-ball-face,${CUSTOM}.ubp-mobile-lite .ubp-ball .ubp-ball-game.on,${CUSTOM}.ubp-mobile-lite .ubp-ball .ubp-ball-ai.on,${CUSTOM}.ubp-mobile-lite .ubp-ball.ubp-ball-ai-on::after{animation:none!important}`);
   return parts.join('\n');
 }
 

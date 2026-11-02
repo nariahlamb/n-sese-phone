@@ -13,6 +13,8 @@ import { extractStoryDateTime, storyClockText } from '../core/story-clock';
 import { S, appDisplayColor, appDisplayName, appDisplayIcon, currentStyle, s } from '../core/skins';
 import { currentCustomSkin, currentSkinId, phoneSkinCss, resolvePhoneFontStack, skinAppColor, skinAppIcon, skinAppName } from '../core/skin-themes';
 import { hostDocument, hostWindow } from '../core/host-env';
+import { cssColorChannels, isMobileLiteEnvironment } from '../../unified-statusbar/core/mobile-environment';
+import { floatingEdgeAt, snapFloatingToEdge, type FloatingEdge } from '../../unified-statusbar/core/floating-dock';
 import { gameProgressStatus, onGameStateChanged } from '../core/game-engine';
 import { onHostReadinessChanged, probeHostReadiness, rematchHost, type HostReadiness } from '../core/host-readiness';
 import {
@@ -148,8 +150,26 @@ function topDoubleTap(): boolean {
   return false;
 }
 
+/** 拖拽跟手与贴边：外框负责 48px 热区，半隐藏只改变视觉面；存储坐标不含隐藏偏移。 */
+function syncBallDock(ball: HTMLElement, edge: FloatingEdge): void {
+  ball.classList.toggle('ubp-dock-left', edge === 'left');
+  ball.classList.toggle('ubp-dock-right', edge === 'right');
+  ball.classList.remove('ubp-dragging');
+}
+
+function revealBallDock(ball: HTMLElement): void {
+  ball.classList.remove('ubp-dock-left', 'ubp-dock-right');
+}
+
 /** 通用拖拽绑定（pointer events，宿主坐标系；宽高惰性取值以适配显隐切换）。 */
-function bindDrag(handle: HTMLElement, target: HTMLElement, posKey: string, width: () => number, height: () => number): void {
+function bindDrag(
+  handle: HTMLElement,
+  target: HTMLElement,
+  posKey: string,
+  width: () => number,
+  height: () => number,
+  opts?: { snapBall?: boolean },
+): void {
   let dragging = false;
   let startX = 0;
   let startY = 0;
@@ -178,13 +198,25 @@ function bindDrag(handle: HTMLElement, target: HTMLElement, posKey: string, widt
     target.style.top = `${clamped.top}px`;
     target.style.right = 'auto';
     target.style.bottom = 'auto';
+    if (opts?.snapBall) target.classList.add('ubp-dragging');
   });
   handle.addEventListener('pointerup', (e: PointerEvent) => {
     if (!dragging) return;
     dragging = false;
     if (moved) {
       const rect = target.getBoundingClientRect();
-      writePos(posKey, rect.left, rect.top);
+      let left = rect.left;
+      let top = rect.top;
+      if (opts?.snapBall) {
+        const win = hostWindow();
+        const snapped = snapFloatingToEdge(left, top, win.innerWidth, win.innerHeight, width(), height());
+        left = snapped.left;
+        top = snapped.top;
+        target.style.left = `${left}px`;
+        target.style.top = `${top}px`;
+        syncBallDock(target, snapped.edge);
+      }
+      writePos(posKey, left, top); // 兼容既有 {left,top}，不额外存视觉态
       _dragEndedAt = Date.now(); // 拖后吞 click（防误触）
       e.stopPropagation();
       e.preventDefault();
@@ -267,11 +299,13 @@ export function mountPhone(): void {
   style.textContent = PHONE_CSS;
   shadow.appendChild(style);
 
+  // 宿主文档上的插件专属标记只用于 Shadow CSS 的 :host-context；不写设置、不持久化。
+  doc.documentElement.setAttribute('data-ubp-mobile-lite', isMobileLiteEnvironment(hostWindow()) ? '1' : '0');
   const scope = doc.createElement('div');
   scope.className = 'ubp-scope';
   scope.innerHTML = `
-    <div class="ubp-ball" title="瑟瑟小手机">
-      ${ubpIcon('phone')}
+    <div class="ubp-ball" title="瑟瑟小手机" role="button" tabindex="0" aria-label="瑟瑟小手机" aria-keyshortcuts="Enter Space">
+      <span class="ubp-ball-face">${ubpIcon('phone')}</span>
       <span class="ubp-ball-dot"></span>
       <span class="ubp-ball-ai"></span>
       <span class="ubp-ball-game"></span>
@@ -301,11 +335,12 @@ export function mountPhone(): void {
   // 位置恢复/初始化
   const ballPos = readPos(BALL_POS_KEY);
   if (ballPos) {
-    const p = clampToViewport(ballPos.left, ballPos.top, 46, 46);
+    const p = clampToViewport(ballPos.left, ballPos.top, 48, 48);
     ball.style.left = `${p.left}px`;
     ball.style.top = `${p.top}px`;
     ball.style.right = 'auto';
     ball.style.bottom = 'auto';
+    syncBallDock(ball, floatingEdgeAt(p.left, 48, hostWindow().innerWidth));
   }
   const phonePos = readPos(PHONE_POS_KEY);
   if (phonePos && !isNarrowFullscreenViewport()) {
@@ -318,12 +353,19 @@ export function mountPhone(): void {
   }
 
   // 拖拽
-  bindDrag(ball, ball, BALL_POS_KEY, () => 46, () => 46);
+  bindDrag(ball, ball, BALL_POS_KEY, () => 48, () => 48, { snapBall: true });
   bindDrag(notch, phone, PHONE_POS_KEY, () => phone.getBoundingClientRect().width || 375, () => phone.getBoundingClientRect().height || 700);
 
   // 交互：单击=开关手机（SH-05：0.7s 三连击彩蛋退役 → 「重置主项目悬浮按钮」改为设置页显式按钮）
   ball.addEventListener('click', () => {
     if (dragJustEnded()) return; // 拖完的残留 click 不算点击
+    revealBallDock(ball);
+    togglePhone();
+  });
+  ball.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    revealBallDock(ball);
     togglePhone();
   });
   notch.addEventListener('click', () => {
@@ -383,7 +425,10 @@ export function mountPhone(): void {
     onHostConfigSynced(applyChrome), // 主项目 DAY/NIGHT 切换落盘推送 → 重读 darkTheme 后刷新明暗
     onPhoneEvent('ubp-phone:call-ring', on => {
       const ball = _shadow?.querySelector('.ubp-ball') as HTMLElement | null;
-      ball?.classList.toggle('ubp-ring', on === true);
+      const ringing = on === true;
+      ball?.classList.toggle('ubp-ring', ringing && !isMobileLiteEnvironment(hostWindow()));
+      // 手机关闭装饰摇铃，但保留静态来电提示点，不能用“无动画”抹掉功能状态。
+      ball?.classList.toggle('ubp-call-active', ringing);
       // 来电全屏接管（I-1）：铃响期间锁屏让位，让电话界面盖满屏幕；挂断/接听后锁屏回来
       _lockLayer?.classList.toggle('ubp-lock-behind', on === true);
     }),
@@ -1751,7 +1796,16 @@ function applyChrome(): void {
   syncFontFaces();
   // 悬浮球 tooltip 随风格换设备名（元层信息，纯展示）
   const ball = _shadow?.querySelector('.ubp-ball') as HTMLElement | null;
-  if (ball) ball.title = s(style, '瑟瑟小手机', '传讯玉简', '天机匣', '传讯水晶');
+  const mobileLite = isMobileLiteEnvironment(hostWindow());
+  hostDocument().documentElement.setAttribute('data-ubp-mobile-lite', mobileLite ? '1' : '0');
+  scope.classList.toggle('ubp-mobile-lite', mobileLite);
+  if (ball) {
+    ball.title = s(style, '瑟瑟小手机', '传讯玉简', '天机匣', '传讯水晶');
+    // 仅主题/皮肤刷新时取一次；不在 pointermove 或聊天滚动路径做样式读取。
+    const theme = getComputedStyle(ball);
+    const rgb = cssColorChannels(theme.getPropertyValue('--ubp-frame')) || '16,16,19';
+    ball.style.setProperty('--ubp-ball-rgb', rgb);
+  }
   // 字体设置（设置→通用）：行内变量优先级最高，字号 calc 与字体族全机即时生效；
   // 字体族不设 = 跟随风格（现代系统字体 / 仙侠楷体 / 武侠宋体 / 西幻楷体）或皮肤默认字体
   const settings = getPhoneSettings();

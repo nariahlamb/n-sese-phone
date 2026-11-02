@@ -161,20 +161,50 @@ const PHONE_CSS_RAW = `
 
 /* ── 悬浮球 ── */
 .ubp-ball {
-  /* 默认停靠画面左侧垂直居中（避开右下角一众插件悬浮按钮的重叠区）；
-     禁用 transform 垂直居中——与 :active scale 和摇铃动画的 transform 互相覆盖，改用 calc 偏移（球高 46px，上移 23px） */
-  position: fixed; left: 8px; top: calc(50% - 23px); width: 46px; height: 46px; border-radius: 50%;
-  background: var(--ubp-frame); color: #CFF5E0;
+  /* 48px 触控外框；视觉面独立，贴边半隐藏不影响拖拽坐标或热区。 */
+  position: fixed; left: 8px; top: calc(50% - 24px); width: 48px; height: 48px; border-radius: 50%;
+  background: transparent; color: #CFF5E0;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
   cursor: pointer; pointer-events: auto; user-select: none; touch-action: none;
   /* 悬浮球必须压过手机本体（.ubp-phone z-index:3），否则手机打开时球被遮挡 */
-  z-index: 4; transition: transform 0.15s ease;
+  z-index: 4;
 }
-.ubp-ball:active { transform: scale(0.92); }
-.ubp-ball svg { width: 22px; height: 22px; }
+.ubp-ball .ubp-ball-face {
+  width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgba(var(--ubp-ball-rgb,16,16,19),.68); color: #CFF5E0;
+  border: 1px solid rgba(var(--ubp-ball-rgb,16,16,19),.48);
+  box-shadow: 0 1px 4px rgba(0,0,0,.16); transition: transform .14s ease,filter .14s ease;
+  pointer-events: none; position: relative;
+}
+.ubp-ball.ubp-ring .ubp-ball-face { animation: ubp-ball-ring 1s ease-in-out infinite; }
+.ubp-ball .ubp-ball-face svg { width: 22px; height: 22px; }
+.ubp-ball:active .ubp-ball-face { transform: scale(.92); }
+.ubp-ball.ubp-dragging .ubp-ball-face { transition: none; transform: none; }
+.ubp-ball.ubp-dock-left .ubp-ball-face { transform: translateX(-55%); }
+.ubp-ball.ubp-dock-right .ubp-ball-face { transform: translateX(55%); }
+.ubp-ball.ubp-dock-left .ubp-ball-dot,.ubp-ball.ubp-dock-left .ubp-ball-ai,
+.ubp-ball.ubp-dock-left .ubp-ball-game,.ubp-ball.ubp-dock-right .ubp-ball-dot,
+.ubp-ball.ubp-dock-right .ubp-ball-ai,.ubp-ball.ubp-dock-right .ubp-ball-game { visibility: hidden; }
+.ubp-mobile-lite .ubp-ball .ubp-ball-face { width: 32px; height: 32px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.ubp-mobile-lite .ubp-ball .ubp-ball-face svg { width: 17px; height: 17px; }
+.ubp-mobile-lite .ubp-ball .ubp-ball-dot,.ubp-mobile-lite .ubp-ball .ubp-ball-ai,
+.ubp-mobile-lite .ubp-ball .ubp-ball-game { min-width: 12px; height: 12px; padding: 0 2px; line-height: 12px; font-size: 8px; border-width: 1px; }
+.ubp-mobile-lite .ubp-ball .ubp-ball-game.on { animation: none; }
+.ubp-mobile-lite .ubp-ball .ubp-ball-ai.on { animation: none; }
+.ubp-mobile-lite .ubp-ball.ubp-ball-ai-on::after { animation: none; inset: -1px; border-width: 1px; opacity: .55; }
+.ubp-mobile-lite .ubp-ball.ubp-call-active::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; background: #34C759; pointer-events: none; }
+:host-context(html[data-ubp-mobile-lite="1"]) .ubp-ball .ubp-ball-face { width: 32px; height: 32px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+:host-context(html[data-ubp-mobile-lite="1"]) .ubp-ball .ubp-ball-face svg { width: 17px; height: 17px; }
+/* 手机只停装饰动画；.ubp-spin/.ubp-typing-dots/AI 提示与 loading 保持功能反馈。 */
+.ubp-mobile-lite .ubp-edit .ubp-appgrid .ubp-appnode,
+.ubp-mobile-lite .ubp-call-avatar::before,.ubp-mobile-lite .ubp-call-avatar::after,
+.ubp-mobile-lite .ubp-call-avatar.ringing,.ubp-mobile-lite .ubp-call-avatar.ringing::before,
+.ubp-mobile-lite .ubp-rp-open { animation: none !important; }
+.ubp-mobile-lite .ubp-iconbtn,.ubp-mobile-lite .ubp-appnode,
+.ubp-mobile-lite .ubp-appicon,.ubp-mobile-lite .ubp-card,
+.ubp-mobile-lite .ubp-switch-track,.ubp-mobile-lite .ubp-switch-knob { transition: none; }
 /* 来电摇铃（世界演化联动：电话 App 派发 call-ring 事件） */
-.ubp-ball.ubp-ring { animation: ubp-ball-ring 1s ease-in-out infinite; }
+/* 来电摇铃挂视觉面，避免与外框拖拽/贴边 transform 互相覆盖。 */
 @keyframes ubp-ball-ring {
   0%, 100% { transform: rotate(0deg); }
   20% { transform: rotate(-14deg); }
