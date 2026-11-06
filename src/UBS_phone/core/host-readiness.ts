@@ -5,6 +5,7 @@
 // 不新增任何桥协议、不写任何存储——rematch 全部复用既有 sync / notify 函数，零重复实现。
 
 import { hostWindow } from './host-env';
+import { syncPhoneFieldContracts } from './field-contracts';
 import { hostConfigState, refreshHostConfig, type HostConfigState } from './host-config';
 import { getPhoneSettings } from './phone-settings';
 import {
@@ -105,6 +106,7 @@ function armRetry(): void {
  */
 async function attemptRematch(): Promise<HostReadiness> {
   clearRetry();
+  syncPhoneFieldContracts();
   await refreshHostConfig().catch(() => undefined);
   syncPhoneMessageProjectionRegistration();
   syncSpyProjectionRegistration();

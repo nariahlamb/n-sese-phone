@@ -5,6 +5,7 @@ import { hasDbSchemaMapping, normalizeRowKeys, sqlColumnName, sqlTableName, DB_S
 import { createDbWriteQueue, type DbWriteOp, type DbWriteOpInternal } from './db-write-queue';
 import { UB_EVENT, emitUbEvent } from './events';
 import { getLedgerCanonical } from './ledger-takeover';
+import { clearPhoneFieldContractSnapshot, inspectPhoneFieldContracts, inspectPhoneTableContract, reportPhoneMissingField, syncPhoneFieldContracts } from '../../UBS_phone/core/field-contracts';
 
 export type { DbWriteOp } from './db-write-queue';
 
@@ -68,6 +69,7 @@ function buildSheetCache(): void {
     const m = ddl.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
     if (m) _allSheetsCache[m[1]] = sheet;
   }
+  inspectPhoneFieldContracts(_allSheetsCache);
   // 写回队列重放：缓存重建（插件回调后 invalidateCache）时把未确认批次重新叠加上去，
   // 防止「乐观值 → flush 完成」之间 UI 闪回旧值；flush 已完成时批次为空，零开销。
   try { dbWriteQueue.replayPendingOverlay(); } catch { /* ignore */ }
@@ -95,6 +97,7 @@ export function resolveTableNameForApi(tableName: string): string {
 }
 
 export function getAutoCardAPI(): any {
+  syncPhoneFieldContracts();
   // 瑟瑟台账（SeseLedger）canonical API 优先；未装载时回落 AutoCardUpdaterAPI（真数据库/台账别名）。
   let api: any = null;
   const ledger = getLedgerCanonical();
@@ -117,7 +120,9 @@ function tableApiOf(ledger: any): any {
 
 export function getSheetByName(tableName: string): SheetContent | null {
   if (!_allSheetsCache) buildSheetCache();
-  return _allSheetsCache?.[tableName] || null;
+  const sheet = _allSheetsCache?.[tableName] || null;
+  if (!sheet) reportPhoneMissingField(tableName);
+  return sheet;
 }
 
 /**
@@ -208,6 +213,7 @@ export function readColumnValues(tableName: string, colName: string): string[] {
 }
 
 export function invalidateCache(): void {
+  clearPhoneFieldContractSnapshot();
   _allSheetsCache = null;
   _playListCache = null;
   // O13/O14：失效即推进令牌（缓存代++），保证「已失效→重建」前后令牌必不同
@@ -286,6 +292,7 @@ export function queryLogicalTableRows(
   try {
     const api = getAutoCardAPI();
     if (!api || typeof api.queryTableRows !== 'function') throw new Error('queryTableRows unavailable');
+    inspectPhoneTableContract(api, tableName);
     if (!tableName) throw new Error('逻辑表名不能为空');
     if (!Array.isArray(query.columns) || query.columns.length === 0) {
       throw new Error('查询列不能为空');
@@ -351,6 +358,7 @@ export function queryLogicalTablePage(
   try {
     const api = getAutoCardAPI();
     if (!api || typeof api.queryTableRows !== 'function') throw new Error('queryTableRows unavailable');
+    inspectPhoneTableContract(api, tableName);
     if (!tableName || !Array.isArray(query.columns) || query.columns.length === 0) throw new Error('invalid query');
     const columns = query.columns.map(column => validateSqlIdentifier(String(column)));
     for (const column of Object.keys(query.where || {})) validateSqlIdentifier(column);

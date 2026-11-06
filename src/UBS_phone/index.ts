@@ -6,6 +6,7 @@ import { bindHostConfigSync, bootHostConfig } from './core/host-config';
 import { bindCurrencyHostChange } from './core/currency-link';
 import { clearPhoneImageErrors } from './core/chat-images';
 import { hostWindow } from './core/host-env';
+import { resetPhoneFieldContractReports } from './core/field-contracts';
 import { initPhoneAiActivityNotify } from './core/ai-activity-notify';
 import { PHONE_ONLINE_EVENT, topWindowCandidates } from '../unified-statusbar/core/cross-window';
 import { clearPhoneMapLocationsCache } from './core/map-locations';
@@ -15,7 +16,7 @@ import { flushPhoneStore, readPhoneDataRef, rebindPhoneStore } from './core/phon
 import { rebindPhoneAvatars, refreshPhoneAvatars } from './core/phone-avatars';
 import { totalUnread } from './core/chat-model';
 import { socialNotificationUnread } from './core/social-model';
-import { bindRosterInvalidation, onRosterInvalidated } from './core/roster';
+import { bindRosterInvalidation, invalidateRosterCache, onRosterInvalidated } from './core/roster';
 import { bindStoryLinkListener, verifyStoryLinkOnChatChange, STORY_LINK_ME } from './core/story-link';
 import { syncStoryCallEnhancer } from './renderers/story-link-enhance';
 import { bindWorldPhoneBridge } from './core/world-link';
@@ -59,6 +60,8 @@ function scheduleChatRebind(): void {
   if (_rebindTimer) clearTimeout(_rebindTimer);
   _rebindTimer = setTimeout(async () => {
     _rebindTimer = null;
+    resetPhoneFieldContractReports();
+    invalidateRosterCache();
     try {
       const status = await rebindPhoneStore();
       void rebindPhoneAvatars(status.storageId).catch(() => undefined); // 立绘只读快照随聊天身份重建

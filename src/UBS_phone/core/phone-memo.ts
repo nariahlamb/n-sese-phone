@@ -7,6 +7,7 @@ import type { Conversation } from './chat-model';
 import type { ParsedChatMemo } from './chat-parser';
 import type { RosterSnapshot } from './roster';
 import { hostWindow } from './host-env';
+import { inspectPhoneTableContract, syncPhoneFieldContracts } from './field-contracts';
 import { yearOfDateKey, matchedInsideDigitRun } from './social-time';
 import { readPhoneDataRef } from './phone-store';
 import { normalizeRowKeys, sqlColumnName, sqlTableName } from '../../unified-statusbar/core/db-schema-map';
@@ -102,6 +103,7 @@ export function memoDraftToRow(draft: MemoDraft): MemoRow {
 
 /** 神数据库 API 取用口（导出给 phone-inventory 复用——物品表写入与备忘录同一套宿主访问纪律）。 */
 export function getAutoCardAPI(): any {
+  syncPhoneFieldContracts();
   // 瑟瑟台账（SeseLedger）canonical 优先（__legacyFace 为兼容方法面）；未装载回落 AutoCardUpdaterAPI。
   try {
     const w = hostWindow() as any;
@@ -177,6 +179,7 @@ type SqlWriteOutcome = { ok: true } | { ok: false; error: string };
 
 async function runInsert(row: MemoRow): Promise<SqlWriteOutcome> {
   const api = getAutoCardAPI();
+  inspectPhoneTableContract(api, '备忘录');
   if (!api) return { ok: false, error: '未检测到表格后端（真数据库 / 瑟瑟台账）' };
   const stmt = buildInsertSql(row);
   if (typeof api.executeSqlMutation === 'function') {
@@ -259,6 +262,7 @@ export function memoTitleFromBubbleText(text: string): string {
 /** 备忘录表通用查询：columns 必带 row_id；行最近优先（DESC，手机新增条目在尾部）；
  *  1000=各版本 queryTableRows 单页上限。无读能力/异常返回 null（区别于「空表」）。 */
 function queryMemoRows(api: any, columns: string[]): Array<Record<string, unknown>> | null {
+  inspectPhoneTableContract(api, '备忘录');
   if (typeof api.queryTableRows !== 'function') return null;
   try {
     const res = api.queryTableRows({

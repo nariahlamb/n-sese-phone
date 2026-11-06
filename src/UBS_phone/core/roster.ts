@@ -4,6 +4,7 @@
 // registerTableUpdateCallback 绑一次负责失效。
 
 import { hostWindow } from './host-env';
+import { clearPhoneFieldContractSnapshot, inspectPhoneFieldContracts, syncPhoneFieldContracts } from './field-contracts';
 import { matchedInsideDigitRun, parseStoryAnchor } from './social-time';
 
 export type RosterCategory = 'romance' | 'important';
@@ -99,10 +100,12 @@ function getAutoCardAPI(): any {
 
 let _cache: RosterSnapshot | null = null;
 let _cacheAt = 0;
+let _cacheContractApi: any = null;
 /** 空快照（无数据库）短 TTL：数据库插件晚于小手机就绪时能自动被发现；有数据则常驻（表格回调负责失效）。 */
 const EMPTY_CACHE_TTL_MS = 3000;
 
 export function invalidateRosterCache(): void {
+  clearPhoneFieldContractSnapshot();
   _cache = null;
   _cacheAt = 0;
   for (const listener of _rosterInvalidatedListeners) {
@@ -119,6 +122,7 @@ export function onRosterInvalidated(cb: () => void): void {
 
 /** 表格回调失效绑定（守卫防重）。返回是否首次绑定。 */
 export function bindRosterInvalidation(): boolean {
+  syncPhoneFieldContracts();
   const w = hostWindow() as any;
   if (w.__ubp_roster_bound) return false;
   const api = getAutoCardAPI();
@@ -168,6 +172,7 @@ function buildSheetIndex(api: any): Record<string, SheetLike> | null {
       count++;
     }
   }
+  if (count > 0) inspectPhoneFieldContracts(index);
   return count > 0 ? index : null;
 }
 
@@ -228,7 +233,7 @@ function readContactTable(sheets: Record<string, SheetLike>, tableName: string, 
       identity: cell(sheet, i, '身份'),
       languageStyle: cell(sheet, i, '语言风格和口癖'),
       attitude: cell(sheet, i, '对主角态度'),
-      recentIntimacy: cell(sheet, i, '最近亲密互动'),
+      recentIntimacy: cell(sheet, i, category === 'romance' ? '最近亲密互动' : '过往经历'),
     });
   }
   return out;
@@ -245,7 +250,7 @@ function readRelations(sheets: Record<string, SheetLike>, names: string[]): Rela
     const b = cell(sheet, i, '人物B');
     if (!a || !b) continue;
     if (!nameSet.has(a) && !nameSet.has(b)) continue;
-    out.push({ a, b, type: cell(sheet, i, '关系类型'), state: cell(sheet, i, '当前状态') });
+    out.push({ a, b, type: cell(sheet, i, '关系类型'), state: cell(sheet, i, '关系状态') });
   }
   return out;
 }
@@ -287,6 +292,11 @@ function readMacroUser(): string {
 
 /** 取通讯录/在场/全局/关系快照（缓存；表格回调自动失效；空快照 3s TTL）。 */
 export function getRoster(): RosterSnapshot {
+  const contractApi = syncPhoneFieldContracts();
+  if (_cacheContractApi !== contractApi) {
+    _cacheContractApi = contractApi;
+    _cache = null;
+  }
   if (_cache && (_cache.hasDb || Date.now() - _cacheAt < EMPTY_CACHE_TTL_MS)) return _cache;
   _cacheAt = Date.now();
   const api = getAutoCardAPI();

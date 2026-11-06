@@ -6,6 +6,7 @@
 //   物品名称→item_name / 类型→item_type / 数量→quantity / 描述→description。
 // 仅 SQLite 模式可用；失败分级返回（调用方按「订单保持在途、下次结算重试」处理）。
 
+import { inspectPhoneTableContract } from './field-contracts';
 import { getAutoCardAPI, mutationChangedExactlyOneRow, sqlEscape } from './phone-memo';
 import { sqlColumnName, sqlTableName } from '../../unified-statusbar/core/db-schema-map';
 
@@ -58,6 +59,7 @@ function buildInsertSql(row: ItemRow): { parameterizedSql: string; params: strin
 
 async function runInsert(row: ItemRow): Promise<boolean> {
   const api = getAutoCardAPI();
+  inspectPhoneTableContract(api, '物品表');
   if (!api) return false;
   const stmt = buildInsertSql(row);
   if (typeof api.executeSqlMutation === 'function') {

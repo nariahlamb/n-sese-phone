@@ -1,11 +1,12 @@
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { build, transform } from 'esbuild';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import jquery from 'jquery';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const pointer = (win, el, type, x, y) => {
   const event = new win.Event(type, { bubbles: true, cancelable: true });
   Object.assign(event, { clientX: x, clientY: y, pointerId: 1 });
