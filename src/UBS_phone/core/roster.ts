@@ -20,6 +20,7 @@ export interface RosterContact {
   languageStyle: string;
   attitude: string;
   recentIntimacy: string;
+  pastExperience: string;
   /** 自定义联系人标记（通讯录「＋」添加、数据库无记录；true 时其余档案字段为空）。 */
   custom?: boolean;
 }
@@ -172,7 +173,7 @@ function buildSheetIndex(api: any): Record<string, SheetLike> | null {
       count++;
     }
   }
-  if (count > 0) inspectPhoneFieldContracts(index);
+  if (count > 0) inspectPhoneFieldContracts(index, undefined, api);
   return count > 0 ? index : null;
 }
 
@@ -233,7 +234,8 @@ function readContactTable(sheets: Record<string, SheetLike>, tableName: string, 
       identity: cell(sheet, i, '身份'),
       languageStyle: cell(sheet, i, '语言风格和口癖'),
       attitude: cell(sheet, i, '对主角态度'),
-      recentIntimacy: cell(sheet, i, category === 'romance' ? '最近亲密互动' : '过往经历'),
+      recentIntimacy: category === 'romance' ? cell(sheet, i, '最近亲密互动') : '',
+      pastExperience: category === 'important' ? cell(sheet, i, '过往经历') : '',
     });
   }
   return out;
@@ -413,7 +415,7 @@ export function mergeCustomContacts(roster: RosterSnapshot, customNames: readonl
     ...roster.contacts,
     ...extra.map(name => ({
       name, category: 'important' as const, gender: '', age: '', brief: '', appearance: '',
-      identity: '', languageStyle: '', attitude: '', recentIntimacy: '', custom: true,
+      identity: '', languageStyle: '', attitude: '', recentIntimacy: '', pastExperience: '', custom: true,
     })),
   ];
 }

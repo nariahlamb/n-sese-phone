@@ -69,7 +69,7 @@ function buildSheetCache(): void {
     const m = ddl.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
     if (m) _allSheetsCache[m[1]] = sheet;
   }
-  inspectPhoneFieldContracts(_allSheetsCache);
+  inspectPhoneFieldContracts(_allSheetsCache, undefined, API);
   // 写回队列重放：缓存重建（插件回调后 invalidateCache）时把未确认批次重新叠加上去，
   // 防止「乐观值 → flush 完成」之间 UI 闪回旧值；flush 已完成时批次为空，零开销。
   try { dbWriteQueue.replayPendingOverlay(); } catch { /* ignore */ }

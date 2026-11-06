@@ -92,6 +92,7 @@ export function contactSection(roster: RosterSnapshot, name: string): string {
   if (contact?.languageStyle) lines.push(`　语言风格与口癖：${contact.languageStyle.slice(0, 200)}`);
   if (contact?.attitude) lines.push(`　对主角态度：${contact.attitude.slice(0, 200)}`);
   if (contact?.recentIntimacy) lines.push(`　最近亲密互动：${contact.recentIntimacy.slice(0, 200)}`);
+  if (contact?.pastExperience) lines.push(`　过往经历：${contact.pastExperience.slice(0, 200)}`);
   if (present?.status || present?.emotion) {
     lines.push(`　当前状态：${present.status || '未记录'}　情绪：${present.emotion || '未记录'}`);
   }

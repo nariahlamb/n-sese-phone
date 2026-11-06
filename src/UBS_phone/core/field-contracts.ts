@@ -9,7 +9,7 @@ export interface PhoneFieldContract {
 }
 
 const fields = (table: string, feature: string, columns: readonly string[]): PhoneFieldContract[] =>
-  columns.map(column => ({ table, column, feature }));
+  columns.map(column => ({ table, column, feature, required: true }));
 
 export const PHONE_FIELD_CONTRACTS: readonly PhoneFieldContract[] = [
   ...fields('全局数据表', '通讯录与故事时间', ['当前详细地点', '当前时间', '是否色色']),
@@ -24,8 +24,6 @@ export const PHONE_FIELD_CONTRACTS: readonly PhoneFieldContract[] = [
   ...fields('纪要表', '聊天与社交纪要资料', ['时间跨度', '概览', '纪要', '重要对话']),
   ...fields('备忘录', '备忘与日程提醒', ['row_id', '备忘标题', '类型', '相关角色', '详细内容', '当前状态', '记录时间', '约定时间', '后续结果']),
   ...fields('物品表', '商城送达入库', ['row_id', '物品名称', '类型', '数量', '描述']),
-  ...['恋爱对象表', '重要角色表'].map(table => ({ table, column: '最近亲密互动', feature: '亲密互动兼容读取', required: false, optionalReason: '角色共用解析函数的兼容字段；标准恋爱对象表提供此列，重要角色表不读取为必需。' })),
-  ...['恋爱对象表', '重要角色表'].map(table => ({ table, column: '过往经历', feature: '角色经历兼容读取', required: false, optionalReason: '角色分支兼容字段；恋爱对象优先读取最近亲密互动，重要角色读取过往经历。' })),
   ...['主角信息表', '恋爱对象表', '重要角色表'].map(table => ({
     table, column: '年龄', feature: '旧版角色年龄兼容', required: false,
     optionalReason: '旧模板年龄列兜底；标准新模板以生日替代。',
@@ -88,35 +86,46 @@ export function reportPhoneMissingField(table: string, column?: string): void {
   }
 }
 
-export function inspectPhoneFieldContracts(sheets: Record<string, { content?: unknown }>, table?: string): void {
-  if (!syncPhoneFieldContracts()) return;
-  for (const item of PHONE_FIELD_CONTRACTS) {
-    if (item.required === false || (table && item.table !== table)) continue;
-    const sheet = sheets[item.table];
-    if (!sheet || !Array.isArray(sheet.content)) {
-      reportPhoneMissingField(item.table);
-      continue;
+export function inspectPhoneFieldContracts(sheets: Record<string, { content?: unknown }>, table?: string, sourceApi?: any): void {
+  try {
+    if (!syncPhoneFieldContracts()) return;
+    if (!table && sourceApi) {
+      const headers: Record<string, { content?: unknown }> = {};
+      for (const [name, sheet] of Object.entries(sheets)) {
+        if (Array.isArray(sheet.content)) headers[name] = { content: [sheet.content[0]] };
+      }
+      _snapshotApi = sourceApi;
+      _snapshot = headers;
     }
-    const headers = sheet.content[0];
-    if (item.column && (!Array.isArray(headers) || !headers.includes(item.column))) {
-      reportPhoneMissingField(item.table, item.column);
+    for (const item of PHONE_FIELD_CONTRACTS) {
+      if (item.required === false || (table && item.table !== table)) continue;
+      const sheet = sheets[item.table];
+      if (!sheet || !Array.isArray(sheet.content)) {
+        reportPhoneMissingField(item.table);
+        continue;
+      }
+      const headers = sheet.content[0];
+      if (item.column && (!Array.isArray(headers) || !headers.includes(item.column))) {
+        reportPhoneMissingField(item.table, item.column);
+      }
     }
-  }
+  } catch {}
 }
 
 export function inspectPhoneTableContract(api: any, table: string): void {
-  if (!syncPhoneFieldContracts() || typeof api?.exportTableAsJson !== 'function') return;
   try {
+    const contracts = syncPhoneFieldContracts();
+    if (!contracts) return;
     if (_snapshotApi !== api || !_snapshot) {
-      const all = api.exportTableAsJson();
-      if (!all || typeof all !== 'object') return;
-      const sheets: Record<string, { content?: unknown }> = {};
-      for (const [key, sheet] of Object.entries(all) as [string, any][]) {
-        if (key.startsWith('sheet_') && typeof sheet?.name === 'string' && Array.isArray(sheet.content)) {
-          sheets[sheet.name] = { content: [sheet.content[0]] };
-        }
+      if (typeof contracts.health !== 'function') return;
+      const health = contracts.health();
+      if (!Array.isArray(health)) return;
+      const sheets: Record<string, { content: string[][] }> = {};
+      for (const item of health) {
+        if (item.pluginId !== 'n-sese-phone' || item.tablePresent !== true) continue;
+        const sheet = sheets[item.table] ||= { content: [[]] };
+        if (item.column && item.columnPresent === true) sheet.content[0].push(item.column);
       }
-      if (!Object.keys(sheets).length) return;
       _snapshotApi = api;
       _snapshot = sheets;
     }
