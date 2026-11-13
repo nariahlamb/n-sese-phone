@@ -163,6 +163,26 @@ test('手机挂载：环境标记、主题 RGBA、48px 外框与静态角标；�
     assert(ball.classList.contains('ubp-dock-right'));
     ball.click();
     assert.equal(shadow.querySelector('.ubp-phone').classList.contains('ubp-open'), false, '拖后残留 click 不得误展开小手机');
+
+    // 窗口尺寸在电脑端缩放时：贴右缘的悬浮球准确跟随新宽度贴边，手机机身不会超出窗口范围
+    const phone = shadow.querySelector('.ubp-phone');
+    win.localStorage.setItem('ubp_phone_pos', JSON.stringify({ left: 1500, top: 600 }));
+    Object.defineProperty(win, 'innerWidth', { value: 1280, configurable: true });
+    Object.defineProperty(win, 'innerHeight', { value: 860, configurable: true });
+    win.dispatchEvent(new win.Event('resize'));
+    assert.equal(ball.style.left, '1232px');
+    assert(ball.classList.contains('ubp-dock-right'));
+    assert.equal(phone.style.left, '860px');
+    assert.equal(phone.style.top, '60px');
+
+    // 窗口再次缩窄时：悬浮球与手机机身同步回拉，不飞出窗口外
+    Object.defineProperty(win, 'innerWidth', { value: 900, configurable: true });
+    Object.defineProperty(win, 'innerHeight', { value: 760, configurable: true });
+    win.dispatchEvent(new win.Event('resize'));
+    assert.equal(ball.style.left, '852px');
+    assert.equal(phone.style.left, '525px');
+    assert.equal(phone.style.top, '72px');
+
     assert.equal(win.__ubp_booted, true);
     assert.equal(aiRequests, 0);
     assert.deepEqual(errors, []);

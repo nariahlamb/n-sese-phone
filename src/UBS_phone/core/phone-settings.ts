@@ -15,6 +15,7 @@ import { normalizePromptOverrides, promptOverrideCount } from './prompt-override
 import { IMAGE_PROMPT_RETIRED_KEYS } from './image-prompt-slots';
 import { DEFAULT_PROVIDER_ID, detectProviderByUrl, VOICE_CATALOG_MAX, VOICE_PROVIDERS, voiceFilterSpecs } from './voice-providers';
 import type { VoiceCredential } from './voice-requests';
+import { isMobileLiteEnvironment } from '../../unified-statusbar/core/mobile-environment';
 
 export type PhoneDarkMode = 'auto' | 'light' | 'dark';
 
@@ -50,7 +51,7 @@ export type PhoneRetryScopes = Record<PhoneApiScopeKey, boolean>;
 export const PHONE_FONT_SCALES: readonly number[] = [0.85, 0.92, 1, 1.08, 1.16, 1.25];
 
 /** 整机缩放档位（设置→通用「手机缩放」，transform 等比缩放；下标即滑杆值，1=现状不变）。 */
-export const PHONE_ZOOM_SCALES: readonly number[] = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
+export const PHONE_ZOOM_SCALES: readonly number[] = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
 
 /** 提示音音量档位（轻 / 中 / 响；存实际值，与 PHONE_FONT_SCALES 同款口径）。 */
 export const PHONE_SOUND_VOLUMES: readonly number[] = [0.4, 0.7, 1];
@@ -896,4 +897,40 @@ export async function savePhoneSettings(patch: Partial<PhoneSettings>): Promise<
 
 export async function flushPhoneSettings(): Promise<void> {
   await _store?.flush();
+}
+
+const DESKTOP_ZOOM_STORAGE_KEY = 'ubp_desktop_phone_zoom_v1';
+
+/** 桌面端与移动端整机缩放解耦：电脑端默认 1.0 并存本地 localStorage，避免手机端设置的缩小值（如 0.6）把电脑端也缩成 mini 状态。 */
+export function isDesktopZoomScope(win?: Window): boolean {
+  const w = win ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!w) return false;
+  return !isMobileLiteEnvironment(w);
+}
+
+export function getEffectivePhoneZoom(win?: Window): number {
+  const w = win ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!isDesktopZoomScope(w)) return _settings.phoneZoom;
+  try {
+    const raw = w?.localStorage?.getItem(DESKTOP_ZOOM_STORAGE_KEY);
+    if (raw !== null && raw !== '') {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return snapTo(n, PHONE_ZOOM_SCALES, 1);
+    }
+  } catch (_e) { /* ignore */ }
+  return 1;
+}
+
+export async function saveEffectivePhoneZoom(scale: number, win?: Window): Promise<boolean> {
+  const snapped = snapTo(scale, PHONE_ZOOM_SCALES, 1);
+  const w = win ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!isDesktopZoomScope(w)) {
+    return savePhoneSettings({ phoneZoom: snapped });
+  }
+  try {
+    w?.localStorage?.setItem(DESKTOP_ZOOM_STORAGE_KEY, String(snapped));
+    return true;
+  } catch (_e) {
+    return false;
+  }
 }

@@ -1,15 +1,19 @@
-// 手机轻量模式：触屏、窄屏或 TauriTavern 任一成立即启用。
+// 手机轻量模式：仅在窄屏（<=600px，或 <=768px 且无鼠标）、移动设备 UA 或纯粗指针无鼠标设备上启用。
+// 桌面端 TauriTavern（含分屏窗口）或带鼠标的宽屏 PC 不误判为手机。
 // 仅承载环境/颜色/坐标的纯计算；不要在拖拽或滚动高频路径读取 computed style。
 
 export function isMobileLiteEnvironment(win?: Window): boolean {
   const w = win ?? (typeof window !== 'undefined' ? window : undefined);
   if (!w) return false;
   try {
-    const tt = Boolean((w as any).__TAURITAVERN__) || w.location?.hostname === 'tauri.localhost';
-    const touch = (w.navigator?.maxTouchPoints || 0) > 0
-      || 'ontouchstart' in w
-      || w.matchMedia?.('(pointer: coarse)').matches === true;
-    return tt || touch || w.innerWidth <= 600;
+    const width = Number(w.innerWidth) || 0;
+    if (width > 0 && width <= 600) return true;
+    const ua = String(w.navigator?.userAgent || '');
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+    const coarse = w.matchMedia?.('(pointer: coarse)').matches === true;
+    const fine = w.matchMedia?.('(any-pointer: fine)').matches === true;
+    if (coarse && !fine) return true;
+    return width > 0 && width <= 768 && !fine;
   } catch (_e) {
     return false;
   }

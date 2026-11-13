@@ -30,7 +30,10 @@ import {
 } from '../core/spy-worldbook';
 import {
   flushPhoneSettings,
+  getEffectivePhoneZoom,
   getPhoneSettings,
+  isDesktopZoomScope,
+  saveEffectivePhoneZoom,
   savePhoneSettings,
   promptCustomCount,
   socialCustomCount,
@@ -1231,18 +1234,21 @@ function fontGroupBodyHtml(s: PhoneSettings): string {
 
 /** 通用页「手机缩放」折叠组本体：整机缩放分档滑杆（拖动整机实时预览，松手保存）。
  *  滑杆样式复用字体档 .ubp-font-slider，零新增 CSS；即时预览与松手落盘同 handleInput。 */
-function zoomGroupBodyHtml(s: PhoneSettings): string {
-  const idx = Math.max(0, PHONE_ZOOM_SCALES.indexOf(s.phoneZoom));
+function zoomGroupBodyHtml(_s: PhoneSettings): string {
+  const win = hostWindow();
+  const currentZoom = getEffectivePhoneZoom(win);
+  const idx = Math.max(0, PHONE_ZOOM_SCALES.indexOf(currentZoom));
+  const scopeTip = isDesktopZoomScope(win) ? '当前为电脑端独立缩放（不影响手机端）' : '窄屏全屏模式下不生效';
   return `
         <div class="ubp-fieldrow column">
-          <span class="ubp-fieldlabel">缩放大小<span class="ubp-fieldhint" data-ubp-zoom-pct>${Math.round(s.phoneZoom * 100)}%</span></span>
+          <span class="ubp-fieldlabel">缩放大小<span class="ubp-fieldhint" data-ubp-zoom-pct>${Math.round(currentZoom * 100)}%</span></span>
           <div class="ubp-font-slider">
             <span class="ubp-font-slider-end">小</span>
             <input type="range" min="0" max="${PHONE_ZOOM_SCALES.length - 1}" step="1" value="${idx}" data-ubp-set="phoneZoom">
             <span class="ubp-font-slider-end lg">大</span>
           </div>
         </div>
-        ${noteHtml('拖动即时预览整机大小，松手保存；50%–120% 分档，100% 为原始大小（窄屏全屏模式下不生效）。')}`;
+        ${noteHtml(`拖动即时预览整机大小，松手保存；50%–150% 分档，100% 为原始大小（${scopeTip}）。`)}`;
 }
 
 /** 功能页「相册」折叠卡：循环删除开关 + 最多保留数量（上限只约束未收藏图片）。
@@ -2189,7 +2195,9 @@ function handleChange(event: Event): void {
     case 'phoneZoom': {
       // 松手落盘（拖动中的即时反馈走 handleInput）；applyChrome 经 theme-changed 统一收敛+越界回拉
       const idx = clampNum((target as HTMLInputElement).value, 0, PHONE_ZOOM_SCALES.length - 1, PHONE_ZOOM_SCALES.indexOf(1));
-      void applyPatch({ phoneZoom: PHONE_ZOOM_SCALES[idx] });
+      void saveEffectivePhoneZoom(PHONE_ZOOM_SCALES[idx], hostWindow()).then(() => {
+        emitPhoneEvent('ubp-phone:theme-changed');
+      });
       break;
     }
     case 'phoneStyle':

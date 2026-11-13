@@ -245,6 +245,22 @@ const PHONE_CSS_RAW = `
   box-shadow: var(--ubp-shadow), inset 0 0 0 2px rgba(255,255,255,0.05);
   z-index: 3; pointer-events: auto; user-select: none;
 }
+@media (min-width: 481px) {
+  .ubp-phone {
+    max-width: calc((100vw - 16px) / var(--ubp-zoom, 1));
+    max-height: calc((100dvh - 24px) / var(--ubp-zoom, 1));
+  }
+}
+@media (min-width: 1024px) {
+  .ubp-phone {
+    width: min(410px, 94vw); height: min(780px, calc(100dvh - 56px));
+  }
+}
+@media (min-width: 1280px) {
+  .ubp-phone {
+    width: min(420px, 94vw); height: min(800px, calc(100dvh - 52px));
+  }
+}
 .ubp-phone.ubp-open { display: flex; }
 .ubp-screen {
   /* homebar 高度（含安全区）单一事实源：.ubp-homebar 的 height 与 .ubp-homelayer 的 bottom 同用它，
@@ -473,6 +489,7 @@ const PHONE_CSS_RAW = `
      （offsetTop 多数为 0；少数会滚视觉视口的浏览器里不跟住壳会偏半屏）。缩放仍强制失效：
      transform 从 none 换成 translateY(缺省 0px)，视觉等价、不引入 scale。 */
   .ubp-phone {
+    left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important;
     width: 100vw; height: 100dvh; max-height: calc(100dvh - var(--ubp-kb-h, 0px));
     /* 安全区让位（iPhone 灵动岛/圆角/横屏刘海；口径同主项目 base.ts 的 --safe-*：env() 取值、
        需要处消费，纯 CSS 零 JS）。只让壳——屏内各层（状态栏/桌面层/App/通知中心/壁纸）都长在

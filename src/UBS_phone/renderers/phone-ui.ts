@@ -2,7 +2,7 @@
 
 import { getRoster, bindRosterInvalidation } from '../core/roster';
 import { voiceCachePrune } from '../core/voice-cache';
-import { getPhoneSettings, orderApply, savePhoneSettings } from '../core/phone-settings';
+import { getEffectivePhoneZoom, getPhoneSettings, orderApply, savePhoneSettings } from '../core/phone-settings';
 import { getConfig, onHostConfigSynced } from '../core/host-config';
 import { avatarColor, avatarGradient, resolveAvatarPath } from '../core/phone-avatars';
 import { readHomeBg, readLockBg } from '../core/phone-backgrounds';
@@ -50,6 +50,7 @@ import { ubpIcon, weatherIcon } from './icons';
 
 // 默认位改左中后换代 V2：旧键存的多是旧默认（左上）时代拖出的位置，继续沿用会让新默认永不生效
 const BALL_POS_KEY = 'ubp_ball_pos_v2';
+const BALL_EDGE_KEY = 'ubp_ball_dock_edge';
 const PHONE_POS_KEY = 'ubp_phone_pos';
 /** 底栏第 4 格钉住的 App（设备本地态，与悬浮球/手机位置同一层：换聊天不重置；''=未钉 → 该格显示「＋」）。 */
 const DOCK_PIN_KEY = 'ubp_dock_pin_v1';
@@ -151,6 +152,25 @@ function topDoubleTap(): boolean {
 }
 
 /** 拖拽跟手与贴边：外框负责 48px 热区，半隐藏只改变视觉面；存储坐标不含隐藏偏移。 */
+let _ballDockEdge: FloatingEdge = null;
+let _ballDockRevealed = false;
+
+function readBallEdge(): FloatingEdge {
+  try {
+    const raw = hostWindow().localStorage.getItem(BALL_EDGE_KEY);
+    return raw === 'left' || raw === 'right' ? raw : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function writeBallEdge(edge: FloatingEdge): void {
+  try {
+    if (edge === 'left' || edge === 'right') hostWindow().localStorage.setItem(BALL_EDGE_KEY, edge);
+    else hostWindow().localStorage.removeItem(BALL_EDGE_KEY);
+  } catch (_e) { /* ignore */ }
+}
+
 function syncBallDock(ball: HTMLElement, edge: FloatingEdge): void {
   ball.classList.toggle('ubp-dock-left', edge === 'left');
   ball.classList.toggle('ubp-dock-right', edge === 'right');
@@ -158,6 +178,7 @@ function syncBallDock(ball: HTMLElement, edge: FloatingEdge): void {
 }
 
 function revealBallDock(ball: HTMLElement): void {
+  _ballDockRevealed = true;
   ball.classList.remove('ubp-dock-left', 'ubp-dock-right');
 }
 
@@ -184,6 +205,7 @@ function bindDrag(
     const rect = target.getBoundingClientRect();
     baseLeft = rect.left;
     baseTop = rect.top;
+    if (opts?.snapBall) _ballDockRevealed = false;
     try { handle.setPointerCapture(e.pointerId); } catch (_err) { /* ignore */ }
     e.preventDefault();
   });
@@ -214,6 +236,9 @@ function bindDrag(
         top = snapped.top;
         target.style.left = `${left}px`;
         target.style.top = `${top}px`;
+        _ballDockEdge = snapped.edge;
+        _ballDockRevealed = false;
+        writeBallEdge(snapped.edge);
         syncBallDock(target, snapped.edge);
       }
       writePos(posKey, left, top); // 兼容既有 {left,top}，不额外存视觉态
@@ -333,24 +358,33 @@ export function mountPhone(): void {
   const notch = scope.querySelector('.ubp-notch') as HTMLElement;
 
   // 位置恢复/初始化
+  _ballDockEdge = readBallEdge();
+  _ballDockRevealed = false;
   const ballPos = readPos(BALL_POS_KEY);
   if (ballPos) {
-    const p = clampToViewport(ballPos.left, ballPos.top, 48, 48);
-    ball.style.left = `${p.left}px`;
-    ball.style.top = `${p.top}px`;
-    ball.style.right = 'auto';
-    ball.style.bottom = 'auto';
-    syncBallDock(ball, floatingEdgeAt(p.left, 48, hostWindow().innerWidth));
+    const win = hostWindow();
+    if (!_ballDockEdge) {
+      const inferred = floatingEdgeAt(ballPos.left, 48, win.innerWidth)
+        || (ballPos.left >= Math.max(0, win.innerWidth - 48) ? 'right' : null);
+      if (inferred) _ballDockEdge = inferred;
+    }
+    reclampBallPosition();
   }
-  const phonePos = readPos(PHONE_POS_KEY);
-  if (phonePos && !isNarrowFullscreenViewport()) {
-    const rect = phone.getBoundingClientRect();
-    const p = clampToViewport(phonePos.left, phonePos.top, rect.width || 375, rect.height || 700);
-    phone.style.left = `${p.left}px`;
-    phone.style.top = `${p.top}px`;
-    phone.style.right = 'auto';
-    phone.style.bottom = 'auto';
-  }
+  reclampZoomedPhone();
+
+  // 窗口尺寸/方向变化时实时重算悬浮球贴边与手机壳视口钳制（随壳生命周期解绑）
+  const win = hostWindow();
+  const onWindowResize = (): void => {
+    applyChrome();
+    reclampBallPosition();
+    reclampZoomedPhone();
+  };
+  win.addEventListener('resize', onWindowResize);
+  win.addEventListener('orientationchange', onWindowResize);
+  _shellCleanups.push(() => {
+    win.removeEventListener('resize', onWindowResize);
+    win.removeEventListener('orientationchange', onWindowResize);
+  });
 
   // 拖拽
   bindDrag(ball, ball, BALL_POS_KEY, () => 48, () => 48, { snapBall: true });
@@ -1814,25 +1848,80 @@ function applyChrome(): void {
   const fontStack = resolvePhoneFontStack(settings.fontFamily);
   if (fontStack) scope.style.setProperty('--ubp-font', fontStack);
   else scope.style.removeProperty('--ubp-font');
-  // 整机缩放（设置→通用「手机缩放」）：变量仅 ≠1 时存在（100%=CSS 默认，零差异）
-  if (settings.phoneZoom !== 1) scope.style.setProperty('--ubp-zoom', String(settings.phoneZoom));
+  // 整机缩放（设置→通用「手机缩放」）：桌面端与手机端独立记忆；变量仅 ≠1 时存在（100%=CSS 默认，零差异）
+  const effectiveZoom = getEffectivePhoneZoom(hostWindow());
+  if (effectiveZoom !== 1) scope.style.setProperty('--ubp-zoom', String(effectiveZoom));
   else scope.style.removeProperty('--ubp-zoom');
+  reclampBallPosition();
   reclampZoomedPhone();
   updateClock();
 }
 
-/** 缩放变更后回拉：已拖放定位（inline left/top 存在）的手机按缩放后 rect 重新钳进视口
- *  （原点左上、放大向右下生长 → 右/下可能溢出；缩小无溢出，clamp 幂等无害。
- *  未定位=默认静态位交给 CSS；收起态 rect 归零、clamp 恒等，不会误写位置）。 */
+/** 窗口调整/挂载时重算悬浮球位置：已贴左/右边缘的悬浮球随窗口宽窄准确保持贴边，自由悬浮球钳制在视口内绝不出界。 */
+function reclampBallPosition(): void {
+  const ball = _shadow?.querySelector('.ubp-ball') as HTMLElement | null;
+  if (!ball) return;
+  const win = hostWindow();
+  const saved = readPos(BALL_POS_KEY);
+  if (!saved && !ball.style.left) return;
+  const rawLeft = saved ? saved.left : (Number.parseFloat(ball.style.left) || 8);
+  const rawTop = saved ? saved.top : (Number.parseFloat(ball.style.top) || Math.round(win.innerHeight / 2 - 24));
+  const targetLeft = _ballDockEdge === 'left'
+    ? 0
+    : _ballDockEdge === 'right'
+      ? Math.max(0, win.innerWidth - 48)
+      : rawLeft;
+  const p = clampToViewport(targetLeft, rawTop, 48, 48);
+  ball.style.left = `${p.left}px`;
+  ball.style.top = `${p.top}px`;
+  ball.style.right = 'auto';
+  ball.style.bottom = 'auto';
+  if (_ballDockEdge === 'left' || _ballDockEdge === 'right') {
+    writePos(BALL_POS_KEY, p.left, p.top);
+  }
+  const edge = _ballDockEdge ?? floatingEdgeAt(p.left, 48, win.innerWidth);
+  if (_ballDockRevealed) revealBallDock(ball);
+  else syncBallDock(ball, edge);
+}
+
+function getPhoneVisualSize(phone: HTMLElement, win: Window): { width: number; height: number } {
+  const rect = phone.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+    return { width: rect.width, height: rect.height };
+  }
+  const vw = Math.max(320, win.innerWidth || 1024);
+  const vh = Math.max(320, win.innerHeight || 768);
+  const zoom = getEffectivePhoneZoom(win);
+  const baseW = vw >= 1280 ? Math.min(420, vw * 0.94) : vw >= 1024 ? Math.min(410, vw * 0.94) : Math.min(375, vw * 0.94);
+  const baseH = vw >= 1280 ? Math.min(800, vh - 52) : vw >= 1024 ? Math.min(780, vh - 56) : Math.min(720, vh - 72);
+  return {
+    width: Math.min(vw - 16, Math.max(200, baseW * zoom)),
+    height: Math.min(vh - 24, Math.max(200, baseH * zoom)),
+  };
+}
+
+/** 缩放变更或窗口尺寸变化后回拉：按当前或预期视觉尺寸把手机壳钳进视口，窄屏全屏态清除行内偏移以保住移动端整屏布局。 */
 function reclampZoomedPhone(): void {
   const phone = _shadow?.querySelector('.ubp-phone') as HTMLElement | null;
-  if (!phone || !phone.style.left) return;
-  const rect = phone.getBoundingClientRect();
-  const p = clampToViewport(rect.left, rect.top, rect.width, rect.height);
-  if (p.left !== rect.left || p.top !== rect.top) {
-    phone.style.left = `${p.left}px`;
-    phone.style.top = `${p.top}px`;
+  if (!phone) return;
+  const win = hostWindow();
+  if (isNarrowFullscreenViewport(win)) {
+    phone.style.left = '';
+    phone.style.top = '';
+    phone.style.right = '';
+    phone.style.bottom = '';
+    return;
   }
+  const saved = readPos(PHONE_POS_KEY);
+  if (!saved && !phone.style.left && !phone.style.top) return;
+  const rawLeft = saved ? saved.left : (Number.parseFloat(phone.style.left) || 0);
+  const rawTop = saved ? saved.top : (Number.parseFloat(phone.style.top) || 0);
+  const size = getPhoneVisualSize(phone, win);
+  const p = clampToViewport(rawLeft, rawTop, size.width, size.height);
+  phone.style.left = `${p.left}px`;
+  phone.style.top = `${p.top}px`;
+  phone.style.right = 'auto';
+  phone.style.bottom = 'auto';
 }
 
 let _customSkinCss = '';
