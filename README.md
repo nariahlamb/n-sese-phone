@@ -16,7 +16,7 @@
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
   2. 在酒馆「扩展 → 安装扩展」粘贴本仓库地址，装好后刷新页面；同名旧脚本请先停用。
   3. 配合统一状态栏（提供 API 预设与世界书投影协调器）及台账/数据库数据源使用；进入角色聊天后点击手机悬浮按钮使用。
-- **延伸参考**：[简易教程](https://docs.google.com/document/d/1f5B-GmNLJExH7FE9bwpOb4Ditx5EDHfQtTIXY0WDnX4/edit) · [来源说明](SOURCE_NOTICE.md)
+- **来源与参考**：业务原始源码源自原作者 2026-10-25 公开分享包（原作者已停更），本仓库为个人后续适配与改造维护版本，版权归属见 [SOURCE_NOTICE.md](SOURCE_NOTICE.md) 与 [src/README.md](src/README.md)。 · [简易教程](https://docs.google.com/document/d/1f5B-GmNLJExH7FE9bwpOb4Ditx5EDHfQtTIXY0WDnX4/edit)
 
 ---
 
