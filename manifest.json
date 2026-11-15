@@ -3,7 +3,7 @@
   "loading_order": 220,
   "js": "index.js",
   "author": "Original author / MistHarbor (installation adaptation)",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "homePage": "https://github.com/nariahlamb/n-sese-phone",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
