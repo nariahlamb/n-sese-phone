@@ -571,6 +571,8 @@ export const PORTRAIT_DEFAULT_CONTEXT_COUNT = 2;
 
 // ===== 上下文标签剥离（MANUAL 模式：地图 / 立绘）=====
 /** 默认剥离的标签名列表（不含尖括号、小写）。每个标签 T 会剥离成对的 <T>...</T>（含内容、最短匹配、大小写不敏感、全部出现处）。 */
+/** 默认保留的正文段标签名列表（空=不启用白名单，用户可在 UI 中自行填写如 content、playtxt）。 */
+export const CONTEXT_KEEP_TAGS_DEFAULT: string[] = [];
 export const CONTEXT_STRIP_TAGS_DEFAULT: string[] = ['image'];
 
 // ===== 标准情绪词表（立绘标签/筛选/编辑共用）=====

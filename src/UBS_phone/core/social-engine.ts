@@ -18,11 +18,10 @@
 // 落盘：各平台滚动窗口合并（上限=共享设置 socialMaxPosts）/ 热搜、吧列表整版重写。
 
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { mergeFocusPicks, mergeOneShotHint } from './extra-hint';
 import { keepSpyAndPublicEntries } from './message-worldbook';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { runPhoneRaw } from './phone-raw';
 import {
   buildAuthorProfileDossier,
@@ -1015,8 +1014,8 @@ async function runRefresh(kind: SocialKind, rosterOverride?: RosterSnapshot, foc
   const roster = rosterOverride ?? getRoster();
   const authors = roster.contacts.map(c => c.name);
   const me = roster.protagonistName;
-  const storyText = stripWithContextConfig(readAiChatHistory(settings.socialHistoryCount));
-  const latestLayer = stripWithContextConfig(readAiChatHistory(1));
+  const storyText = readStrippedAiChatHistory(settings.socialHistoryCount);
+  const latestLayer = readStrippedAiChatHistory(1);
   const chronicleBlocks = readChronicleDossierBlocks(authors.slice(0, SOCIAL_DOSSIER_AUTHOR_CAP), settings.summaryCount);
   const phoneData = readPhoneData();
   const oldSocial = readSocialOf(phoneData);
@@ -1214,7 +1213,7 @@ export async function requestSocialFeedback(args: { extraHint?: string; focusNam
         kind: dossierKind,
         authors,
         chronicleBlocks: readChronicleDossierBlocks(authors.slice(0, SOCIAL_DOSSIER_AUTHOR_CAP), settings.summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(settings.socialHistoryCount)),
+        storyText: readStrippedAiChatHistory(settings.socialHistoryCount),
         oldMoments: social.moments,
         oldTieba: social.tieba,
         oldWeibo: social.weibo,

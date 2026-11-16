@@ -5,11 +5,10 @@
 // 富媒体块不带（通话无图片/转账/红包）。不写微信会话/主项目楼层。
 
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { mergeOneShotHint } from './extra-hint';
 import { keepSpyAndPublicEntries } from './message-worldbook';
-import { readAiChatHistory, PhoneChatError } from './chat-engine';
+import { readStrippedAiChatHistory, PhoneChatError } from './chat-engine';
 import { runPhoneRaw } from './phone-raw';
 import {
   buildCallContinuationInstruction,
@@ -80,7 +79,7 @@ async function callTurn(args: CallTurnArgs): Promise<CallEngineResult> {
   const roster = args.rosterOverride ?? getRoster();
   // 纪要统一走资料块（用户定案 V3.710）：被叫角色的完整纪要（取量与原逻辑一致，无概览拆分）；触发注入不再收集 AM 序号
   const chronicleBlocks = readChronicleDossierBlocks([args.peerName], settings.summaryCount);
-  const storyText = stripWithContextConfig(readAiChatHistory(settings.chatHistoryCount));
+  const storyText = readStrippedAiChatHistory(settings.chatHistoryCount);
   // 最近手机记录混合块：与对方的微信消息+通话+朋友圈动态+对方参与的群聊块（排除本次通话，防与「本次通话内容」段重复）
   const phoneData = readPhoneData();
   const mixedRecords = buildMixedRecords({
@@ -222,7 +221,7 @@ export async function generateVoicemail(args: {
   const settings = getPhoneSettings();
   const roster = args.rosterOverride ?? getRoster();
   const chronicleBlocks = readChronicleDossierBlocks([args.peerName], settings.summaryCount);
-  const storyText = stripWithContextConfig(readAiChatHistory(settings.chatHistoryCount));
+  const storyText = readStrippedAiChatHistory(settings.chatHistoryCount);
   const phoneData = readPhoneData();
   const mixedRecords = buildMixedRecords({
     names: [args.peerName],

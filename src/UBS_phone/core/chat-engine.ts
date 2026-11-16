@@ -23,7 +23,7 @@
 // ② 资料块、③ user_input 均不参与绿灯扫描。
 
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
+import { stripWithContextMessages } from '../../unified-statusbar/core/context-strip';
 import { getTavernHelper, hostWindow, makeGenerationId, stopGenerationById } from './host-env';
 import { mergeOneShotHint } from './extra-hint';
 import { keepSpyAndPublicEntries } from './message-worldbook';
@@ -112,8 +112,9 @@ export function abortPhoneGeneration(conversationId?: string): boolean {
  * 标签剥离由调用方过 stripWithContextConfig（主项目"上下文标签剥离"设置）。
  * count<=0 返回空串。
  */
-export function readAiChatHistory(count: number): string {
-  if (count <= 0) return '';
+/** 读取最近 count 条原始 AI 回复正文数组（按时间正序，含隐藏楼层）。 */
+export function readAiChatMessages(count: number): string[] {
+  if (count <= 0) return [];
   const th = getTavernHelper();
   if (th && typeof th.getChatMessages === 'function' && typeof th.getLastMessageId === 'function') {
     try {
@@ -126,15 +127,13 @@ export function readAiChatHistory(count: number): string {
           include_swipes: false,
         }) as any[];
         if (Array.isArray(messages) && messages.length) {
-          const lines: string[] = [];
-          let taken = 0;
-          for (let i = messages.length - 1; i >= 0 && taken < count; i--) {
+          const out: string[] = [];
+          for (let i = messages.length - 1; i >= 0 && out.length < count; i--) {
             const m = messages[i];
             if (!m || typeof m.message !== 'string' || !m.message.trim()) continue;
-            lines.unshift(`AI：${m.message.trim()}`);
-            taken++;
+            out.unshift(m.message.trim());
           }
-          if (lines.length) return lines.join('\n\n');
+          if (out.length) return out;
         }
       }
     } catch (_e) { /* fallthrough */ }
@@ -143,19 +142,26 @@ export function readAiChatHistory(count: number): string {
     const w = hostWindow() as any;
     const chat = w.SillyTavern?.chat;
     if (Array.isArray(chat)) {
-      const lines: string[] = [];
-      let taken = 0;
-      for (let i = chat.length - 1; i >= 0 && taken < count; i--) {
+      const out: string[] = [];
+      for (let i = chat.length - 1; i >= 0 && out.length < count; i--) {
         const m = chat[i];
         if (m && !m.is_user && typeof m.mes === 'string' && m.mes.trim()) {
-          lines.unshift(`AI：${m.mes.trim()}`);
-          taken++;
+          out.unshift(m.mes.trim());
         }
       }
-      if (lines.length) return lines.join('\n\n');
+      if (out.length) return out;
     }
   } catch (_e) { /* ignore */ }
-  return '';
+  return [];
+}
+
+export function readAiChatHistory(count: number): string {
+  return readAiChatMessages(count).map((m) => `AI：${m}`).join('\n\n');
+}
+
+/** 读取最近 count 条 AI 回复并逐楼独立过「上下文标签剥离」后再拼装，防止跨楼误吞。 */
+export function readStrippedAiChatHistory(count: number): string {
+  return stripWithContextMessages(readAiChatMessages(count), 'AI：');
 }
 
 // ─── 主流程 ───
@@ -256,7 +262,7 @@ export async function generateConversationReply(args: GenerateReplyArgs): Promis
   const groupRecent = isGroup
     ? formatMessageHistory(conversation.messages, GROUP_RECENT_MESSAGES)
     : undefined;
-  const storyText = stripWithContextConfig(readAiChatHistory(settings.chatHistoryCount));
+  const storyText = readStrippedAiChatHistory(settings.chatHistoryCount);
 
   // 额外要求合并产物（进指令 + 追加进触发注入语料——提示里提到的人名同样激活世界书条目）
   const mergedExtra = mergeOneShotHint(settings.extraPrompt, args.extraHint);

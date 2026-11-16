@@ -5,9 +5,8 @@
 //   ③ runPhoneRaw（全槽位 + max_chat_history 0 + generation_id 可中止）
 // 解析失败抛可读错误（不静默）；落库与盖戳由调用方（app-browser）处理。
 
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { keepSpyAndPublicEntries } from './message-worldbook';
 import { mergeOneShotHint } from './extra-hint';
@@ -62,7 +61,7 @@ export async function generateBrowserSearch(args: {
   const phoneData = readPhoneData();
   const style = phoneData.style || '';
   const chronicleBlocks = readChronicleDossierBlocks([roster.protagonistName || '我'], Number(settings.summaryCount) || 5);
-  const storyText = stripWithContextConfig(readAiChatHistory(Number(settings.chatHistoryCount) || 5));
+  const storyText = readStrippedAiChatHistory(Number(settings.chatHistoryCount) || 5);
   const mixedRecords = buildMixedRecords({
     names: [roster.protagonistName || '我'],
     conversations: phoneData.conversations,

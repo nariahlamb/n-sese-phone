@@ -14,10 +14,9 @@
 
 import { makeId, revealDelay, sleep } from './ubp-utils';
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { mergeFocusPicks, mergeOneShotHint } from './extra-hint';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { runPhoneRaw } from './phone-raw';
 import { getRoster, type RosterSnapshot } from './roster';
 import type { PhoneChatData } from './chat-model';
@@ -439,14 +438,14 @@ export async function refreshNight(args: NightRefreshArgs = {}): Promise<NightRe
       raw = await generateNightRaw({
         mode,
         scope,
-        triggerText: buildNightTriggerText({ names: triggerNames, storyText: stripWithContextConfig(readAiChatHistory(1)), ...((args.keyword || '').trim() ? { extra: args.keyword!.trim() } : {}) }),
+        triggerText: buildNightTriggerText({ names: triggerNames, storyText: readStrippedAiChatHistory(1), ...((args.keyword || '').trim() ? { extra: args.keyword!.trim() } : {}) }),
         dossierText: buildNightDossierText({
           promptOverrides: getPhoneSettings().nightPrompts,
           roster,
           spice,
           boards,
           chronicleBlocks: readChronicleDossierBlocks(cast, settings.summaryCount),
-          storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+          storyText: readStrippedAiChatHistory(storyCount()),
           castNames: cast,
           digest: nightDigestLines(night.posts),
           readonlySection: readonlySectionOf(me),
@@ -558,14 +557,14 @@ export async function expandNightPost(postId: string, args: { extraHint?: string
     const raw = await generateNightRaw({
       mode: 'post',
       scope,
-      triggerText: buildNightTriggerText({ names: [post.author, ...cast], storyText: stripWithContextConfig(readAiChatHistory(1)) }),
+      triggerText: buildNightTriggerText({ names: [post.author, ...cast], storyText: readStrippedAiChatHistory(1) }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice: nightClampSpice(post.spice, post.board),
         boards: [post.board],
         chronicleBlocks: readChronicleDossierBlocks(cast, getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: cast,
         digest: [`原帖：${post.title || post.content.slice(0, 24)}`, ...post.comments.slice(-6).map(c => `${c.name}：${c.text}`)],
         sceneSection: `■ 目标帖子\n${post.author} 在「${nightBoardName(post.board, style)}」发了：${post.title ? `《${post.title}》` : ''}${post.content}\n标签：${post.tags.join('、')}　尺度：${post.spice}/3\n现有评论：\n${post.comments.map(c => `${c.name}${c.replyTo ? `（回复 ${c.replyTo}）` : ''}：${c.text}`).join('\n') || '（还没有评论）'}`,
@@ -632,14 +631,14 @@ export async function refreshNightLives(args: { extraHint?: string; focusNames?:
     const raw = await generateNightRaw({
       mode: 'live',
       scope,
-      triggerText: buildNightTriggerText({ names: triggerNames, storyText: stripWithContextConfig(readAiChatHistory(1)) }),
+      triggerText: buildNightTriggerText({ names: triggerNames, storyText: readStrippedAiChatHistory(1) }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice,
         boards: ['backstage'],
         chronicleBlocks: readChronicleDossierBlocks(cast, getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: cast,
         digest: nightLiveDigestLines(night.lives),
         readonlySection: readonlySectionOf(me),
@@ -694,14 +693,14 @@ export async function advanceNightLive(liveId: string, args: { extraHint?: strin
     const raw = await generateNightRaw({
       mode,
       scope,
-      triggerText: buildNightTriggerText({ names: [live.streamer], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: live.title }),
+      triggerText: buildNightTriggerText({ names: [live.streamer], storyText: readStrippedAiChatHistory(1), extra: live.title }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice: nightClampSpice(live.spice, 'backstage'),
         boards: ['backstage'],
         chronicleBlocks: readChronicleDossierBlocks([live.streamer], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [live.streamer],
         digest: live.rounds.slice(-3).map(r => r.streamerLines.join(' ')),
         ...(personas ? { personas } : {}),
@@ -828,14 +827,14 @@ export async function submitNightOrder(liveId: string, text: string, args: { ext
     const raw = await generateNightRaw({
       mode: 'order',
       scope,
-      triggerText: buildNightTriggerText({ names: [live.streamer], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: order }),
+      triggerText: buildNightTriggerText({ names: [live.streamer], storyText: readStrippedAiChatHistory(1), extra: order }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice: nightClampSpice(live.spice, 'backstage'),
         boards: ['backstage'],
         chronicleBlocks: readChronicleDossierBlocks([live.streamer], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [live.streamer],
         ...(personas ? { personas } : {}),
         sceneSection: [
@@ -1072,14 +1071,14 @@ export async function pushNightDm(
     const raw = await generateNightRaw({
       mode: 'dm',
       scope,
-      triggerText: buildNightTriggerText({ names: [peer], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: dm?.msgs.slice(-2).map(m => m.text || '').join(' ') }),
+      triggerText: buildNightTriggerText({ names: [peer], storyText: readStrippedAiChatHistory(1), extra: dm?.msgs.slice(-2).map(m => m.text || '').join(' ') }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice,
         boards: ['nighttalk'],
         chronicleBlocks: readChronicleDossierBlocks([peer], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [peer],
         ...(personas ? { personas } : {}),
         sceneSection,
@@ -1228,14 +1227,14 @@ export async function advanceNightDate(dateId: string, args: { choicePicked?: nu
     const raw = await generateNightRaw({
       mode: 'date',
       scope,
-      triggerText: buildNightTriggerText({ names: [date.peer], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: `${date.place} ${date.note}` }),
+      triggerText: buildNightTriggerText({ names: [date.peer], storyText: readStrippedAiChatHistory(1), extra: `${date.place} ${date.note}` }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice,
         boards: ['nighttalk'],
         chronicleBlocks: readChronicleDossierBlocks([date.peer], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [date.peer],
         ...(personas ? { personas } : {}),
         sceneSection: buildDateSceneSection(date, personas?.[0] ?? null),
@@ -1327,7 +1326,7 @@ export async function runNightPersona(name: string, args: { force?: boolean; ros
         spice: nightClampSpice(3, 'nighttalk'),
         boards: ['nighttalk'],
         chronicleBlocks: readChronicleDossierBlocks([name], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [name],
         style,
       }),
@@ -1399,14 +1398,14 @@ export async function refreshNightAboutMe(args: { extraHint?: string; focusNames
     const raw = await generateNightRaw({
       mode: 'aboutMe',
       scope,
-      triggerText: buildNightTriggerText({ names: triggerNames, storyText: stripWithContextConfig(readAiChatHistory(1)) }),
+      triggerText: buildNightTriggerText({ names: triggerNames, storyText: readStrippedAiChatHistory(1) }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice,
         boards: pickBoards(undefined, night),
         chronicleBlocks: readChronicleDossierBlocks(cast, getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: cast,
         digest: nightDigestLines(night.about?.items || []),
         readonlySection: readonlySectionOf(me),
@@ -1468,14 +1467,14 @@ export async function runNightCommissionEntries(postId: string, args: { extraHin
     const raw = await generateNightRaw({
       mode: 'commission',
       scope,
-      triggerText: buildNightTriggerText({ names: post.author === me ? [] : [post.author], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: post.commission.want }),
+      triggerText: buildNightTriggerText({ names: post.author === me ? [] : [post.author], storyText: readStrippedAiChatHistory(1), extra: post.commission.want }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice,
         boards: [post.board],
         chronicleBlocks: '',
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: castNamesFor(roster, [], triggerCount()),
         digest: (post.entries || []).map(e => `${e.author}：${e.text.slice(0, 20)}`),
         sceneSection: `■ 委托内容\n${post.author} 悬赏：${post.commission.want}\n期望尺度：${post.commission.spiceWanted}/3　期望标签：${post.commission.tags.join('、') || '不限'}\n悬赏：${post.commission.reward || '（未写）'}`,
@@ -1571,14 +1570,14 @@ export async function requestNightUnlock(postId: string, imageIndex: number, arg
     const raw = await generateNightRaw({
       mode: 'unlock',
       scope,
-      triggerText: buildNightTriggerText({ names: [post.author], storyText: stripWithContextConfig(readAiChatHistory(1)), extra: image.desc.slice(0, 40) }),
+      triggerText: buildNightTriggerText({ names: [post.author], storyText: readStrippedAiChatHistory(1), extra: image.desc.slice(0, 40) }),
       dossierText: buildNightDossierText({
         promptOverrides: getPhoneSettings().nightPrompts,
         roster,
         spice: nightClampSpice(post.spice, post.board),
         boards: [post.board],
         chronicleBlocks: readChronicleDossierBlocks([post.author], getPhoneSettings().summaryCount),
-        storyText: stripWithContextConfig(readAiChatHistory(storyCount())),
+        storyText: readStrippedAiChatHistory(storyCount()),
         castNames: [post.author],
         sceneSection: `■ 求解锁场景\n发帖人：${post.author}　帖子：${post.title || post.content.slice(0, 30)}\n这张图的画面描述：${image.desc}\n当前互动：帖子获赞 ${post.likes}、收藏 ${post.collects}、已有 ${post.unlockRequests} 人求解锁\n主角的求解锁留言：「求个解锁，私信我？」（署名马甲「${alias}」）`,
         style,

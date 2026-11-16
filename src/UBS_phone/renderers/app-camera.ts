@@ -8,8 +8,7 @@ import { generatePhoneImage, getImageError, resolvePhoneImageConfig } from '../c
 import { readPhoneMapLocations } from '../core/map-locations';
 import { addPhoneAlbumEntries, makeAlbumEntryId, regenAlbumImage } from '../core/phone-album';
 import { composeShotDesc, type PhoneGenRecord } from '../core/chat-model';
-import { readAiChatHistory } from '../core/chat-engine';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
+import { readStrippedAiChatHistory } from '../core/chat-engine';
 import { bindRosterInvalidation, getRoster } from '../core/roster';
 import { S } from '../core/skins';
 import { feedback } from '../core/device-feedback';
@@ -129,7 +128,7 @@ async function shoot(): Promise<void> {
   const location = _state.locations.find(l => l.nodeId === _state.locationId) || null;
   const subjects = shotSubjects(_state.selected);
   // 开启「引用最新正文」时，取主项目最近一层 AI 回复（经上下文标签剥离）作为生图参考
-  const storyContext = _state.useRefStoryContext ? stripWithContextConfig(readAiChatHistory(1)) : '';
+  const storyContext = _state.useRefStoryContext ? readStrippedAiChatHistory(1) : '';
   // 相册描述 = 出镜角色 + 地点 + 用户描述拼接（转发/档案展示用；生图提示词仍按 subjects/location 分块组装）
   const shotDesc = composeShotDesc(subjects.map(s => s.name), location ? location.fullPath : '', desc);
   const jobId = `camera_${Date.now().toString(36)}`;

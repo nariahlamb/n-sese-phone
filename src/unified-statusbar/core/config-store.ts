@@ -6,7 +6,7 @@
 //   2. 设备本地临时态：collapse 折叠态等不跨设备同步的状态用 localStorage（ub_device_config_*）。
 // 注意：本文件仅负责「设置偏好」的持久化；_lsGet/_lsSet 提供给外部存放「临时 UI 状态」
 // （如按钮拖拽位置、展开折叠态），这些状态本就是临时的，仍用 localStorage，不需要跨浏览器同步。
-import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_STRIP_TAGS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
+import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_KEEP_TAGS_DEFAULT, CONTEXT_STRIP_TAGS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
 import { readLocalJson } from './safe-json';
 import { normalizeJailbreakSlotState } from './jailbreak-presets';
 import { NSFW_GUIDANCE_DEFAULT_CONTEXT_COUNT, NSFW_GUIDANCE_DEFAULT_MAX_CHARS, NSFW_GUIDANCE_DEFAULT_MAX_WORLD_BOOK_ENTRIES, NSFW_GUIDANCE_MAX_WORLD_BOOK_ENTRIES } from './constants';
@@ -303,6 +303,8 @@ export interface StatusBarConfig {
    *  作用于各功能读取「剧情上下文」的位置：地图、立绘、瑟瑟指导、正文插图，以及大调查/大采访/
    *  日历/剧情特卖/技能树/世界演化的资料块与触发正文（1A 三段式统一后）。
    *  空数组 = 不剥离。默认 ['image']。 */
+  /** 上下文保留标签名列表（正文白名单，如 content/playtxt；空数组=不启用保留提取）。 */
+  contextKeepTags: string[];
   contextStripTags: string[];
   /** 条目黑名单：每行一个正则（默认忽略英文大小写）。条目名称（备注名）命中的条目在 1A 类
    *  AI 请求（大调查/大采访/日历/剧情特卖/世界演化/技能树/角色世界书 + 小手机微信/电话）的
@@ -488,6 +490,7 @@ const DEFAULT_CONFIG: StatusBarConfig = {
   notifyAlign: 'center',
   notifyEffect: 'auto',
   aiNoticePersist: false,
+  contextKeepTags: [...CONTEXT_KEEP_TAGS_DEFAULT],
   contextStripTags: [...CONTEXT_STRIP_TAGS_DEFAULT],
   entryBlacklist: [],
   tableGroupMode: 'flat',
@@ -869,19 +872,24 @@ function _readGlobalConfig(): Record<string, any> {
 // ===== 配置缓存 =====
 let _configCache: StatusBarConfig | null = null;
 
-// 读取并归一化 contextStripTags：非数组→默认、元素小写去空去重
-function _readContextStripTags(val: any): string[] {
-  if (!Array.isArray(val)) return [...CONTEXT_STRIP_TAGS_DEFAULT];
+// 读取并归一化标签列表：非数组→默认、元素去尖括号/小写/去空/去重（保持从上到下顺序）
+function _readContextTagList(val: any, fallback: string[]): string[] {
+  if (!Array.isArray(val)) return [...fallback];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of val) {
-    const tag = String(raw == null ? '' : raw).trim().toLowerCase();
+    const tag = String(raw == null ? '' : raw).trim().replace(/^<\/?\s*|\s*\/?>$/g, '').trim().toLowerCase();
     if (!tag || seen.has(tag)) continue;
     seen.add(tag);
     out.push(tag);
   }
-  // 若用户显式填了空数组（=[]），保留空（关闭剥离）；非数组或缺字段才回退默认
   return out;
+}
+function _readContextKeepTags(val: any): string[] {
+  return _readContextTagList(val, CONTEXT_KEEP_TAGS_DEFAULT);
+}
+function _readContextStripTags(val: any): string[] {
+  return _readContextTagList(val, CONTEXT_STRIP_TAGS_DEFAULT);
 }
 
 // 读取并归一化 entryBlacklist：非数组→空数组、元素 trim 去空去重（保留原始大小写——正则源不做小写化）
@@ -1269,6 +1277,7 @@ export function getConfig(): StatusBarConfig {
       ? cfg.notifyEffect
       : 'auto', // 含旧值 beautified → auto
     aiNoticePersist: cfg.aiNoticePersist === true,
+    contextKeepTags: _readContextKeepTags(cfg.contextKeepTags),
     contextStripTags: _readContextStripTags(cfg.contextStripTags),
     entryBlacklist: _readEntryBlacklist(cfg.entryBlacklist),
     tableGroupMode: cfg.tableGroupMode === 'grouped' ? 'grouped' : 'flat',

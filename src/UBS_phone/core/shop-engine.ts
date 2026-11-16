@@ -12,10 +12,9 @@
 //   · 余额校验在 UI 收紧（同手机转账/红包口径）：不足即拦，不产生欠款订单。
 // 聊天归属：结算/送达结算都只动**当前聊天**的存储（读 store 引用、写 mutatePhoneData）。
 
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { emitAch } from './phone-achievements';
 import { readLatestChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { keepSpyAndPublicEntries } from './message-worldbook';
 import { mergeOneShotHint } from './extra-hint';
@@ -124,7 +123,7 @@ export async function refreshShopCatalog(args: {
   const spec = shopSpec(style);
   // 取量直传设置值（0=不带），与其他请求口径一致（用户定夺）；纪要=最新 N 条、不筛主角名
   const chronicleBlocks = readLatestChronicleDossierBlocks(settings.summaryCount);
-  const storyText = stripWithContextConfig(readAiChatHistory(settings.chatHistoryCount));
+  const storyText = readStrippedAiChatHistory(settings.chatHistoryCount);
   const mergedExtra = mergeOneShotHint(String(settings.extraPrompt || ''), args.extraPrompt);
 
   // 货币资料块（币种名 + 币种描述 + 精度；用户定案不注入余额）；无联动 → 占位币种

@@ -15,6 +15,8 @@
 // 「我」为协议保留字；正文把主角写成真名等价于「我」（落库侧归一后再判方向）。
 
 import { STORY_LINK_ENTRY_PREFIX } from '../../unified-statusbar/core/worldbook-entry';
+import { getConfig } from '../../unified-statusbar/core/config-store';
+import { normalizeContextTags, stripContextTags } from '../../unified-statusbar/core/context-strip';
 import {
   addCallRecord,
   makeCallRecordId,
@@ -501,23 +503,54 @@ function collectSocialEvents(text: string, social: readonly SocialPlatform[]): A
 
 /** 楼层原文 → 事件列表（按正文出现顺序；相邻同内容压成一条）。
  *  角色间消息（WX_NPC_SOURCE 命中）提取为 spy 事件（落窥私域；落库侧按主角真名归一与白名单收口）。 */
+const STORY_LINK_PROTECTED_TAGS = new Set(['微信', '传讯', '飞鸽', '晶讯', '通话', '传音', '传声', '远语', '动态', '风闻', '榜帖', '见闻']);
+const STORY_LINK_THINKING_TAGS = ['thinking', 'think', 'reasoning', 'reflection', 'deep_thinking', 'dream_think', 'thought'];
+
+function sanitizeStoryLinkSource(raw: string): string {
+  let configuredStrip: string[] = [];
+  let configuredKeep: string[] = [];
+  try {
+    const cfg = getConfig();
+    configuredStrip = cfg.contextStripTags || [];
+    configuredKeep = cfg.contextKeepTags || [];
+  } catch (_e) { /* ignore */ }
+  const stripList = normalizeContextTags([...STORY_LINK_THINKING_TAGS, ...configuredStrip])
+    .filter((t) => !STORY_LINK_PROTECTED_TAGS.has(t));
+  let clean = stripContextTags(String(raw || ''), stripList);
+  const keepList = normalizeContextTags(configuredKeep);
+  if (keepList.length > 0) {
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const firstKeepRe = new RegExp('<(' + keepList.map(esc).join('|') + ')(?=[\\s>])[^<>]*>', 'i');
+    const keepHit = firstKeepRe.exec(clean);
+    if (keepHit && keepHit.index > 0) {
+      const head = clean.slice(0, keepHit.index);
+      if (/<\s*(?:thinking|think|reasoning|reflection|deep_thinking|dream_think|thought)(?=[\s/>])[^>]*>/i.test(head)) {
+        clean = clean.slice(keepHit.index);
+      }
+    }
+  }
+  return clean;
+}
+
 export function extractStoryPhoneEvents(text: string, social: readonly SocialPlatform[] = storyLinkSocialKinds()): StoryPhoneEvent[] {
   if (!text) return [];
+  const cleanText = sanitizeStoryLinkSource(text);
+  if (!cleanText) return [];
   const found: Array<{ at: number; event: StoryPhoneEvent }> = [
-    ...collectMatches(WX_PEER_RE, text, m => {
+    ...collectMatches(WX_PEER_RE, cleanText, m => {
       // 两字段=角色发给主角；三字段接收人=「我」也走这里（收件人字段由 WX_PEER 正则的可选段吸收）
       const name = normalizePeerName(m[1]);
       const content = typeof m[2] === 'string' ? m[2].trim().slice(0, TEXT_MAX) : '';
       if (!name || name === '我' || !content) return null;
       return { kind: 'message', name, text: content };
     }),
-    ...collectMatches(WX_ME_RE, text, m => {
+    ...collectMatches(WX_ME_RE, cleanText, m => {
       const peer = normalizePeerName(m[1]);
       const content = typeof m[2] === 'string' ? m[2].trim().slice(0, TEXT_MAX) : '';
       if (!peer || peer === '我' || !content) return null;
       return { kind: 'message', name: STORY_LINK_ME, peer, text: content };
     }),
-    ...collectMatches(WX_NPC_RE, text, m => {
+    ...collectMatches(WX_NPC_RE, cleanText, m => {
       // 角色间消息（发送人|接收人|内容，双方都不是「我」）→ spy 事件
       const sender = normalizePeerName(m[1]);
       const receiver = normalizePeerName(m[2]);
@@ -525,7 +558,7 @@ export function extractStoryPhoneEvents(text: string, social: readonly SocialPla
       if (!sender || !receiver || sender === receiver || !content) return null;
       return { kind: 'message', name: sender, peer: receiver, text: content, spy: true as const };
     }),
-    ...collectMatches(CALL_RE, text, m => {
+    ...collectMatches(CALL_RE, cleanText, m => {
       const body = String(m[1] ?? '');
       const npc = parseNpcCallBlock(body);
       if (npc) return { kind: 'call', name: npc.caller, peer: npc.callee, lines: npc.lines, spy: true as const };
@@ -533,7 +566,7 @@ export function extractStoryPhoneEvents(text: string, social: readonly SocialPla
       if (!peer || !lines.length) return null;
       return { kind: 'call', name: peer, lines };
     }),
-    ...collectSocialEvents(text, social),
+    ...collectSocialEvents(cleanText, social),
   ];
   let prevKey = '';
   const events: StoryPhoneEvent[] = [];

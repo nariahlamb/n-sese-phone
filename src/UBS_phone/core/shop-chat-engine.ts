@@ -9,9 +9,8 @@
 // 另收：我方发红包（扣款 source='shop'）、我方文字/图片上屏、商家自动消息（零 AI：下单/送达/取消）、红包领取。
 // 聊天归属：生成结果只写**发起时那一个聊天**（调用方在落库前比 currentPhoneStorageId 快照，切聊天整批丢弃）。
 
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { getTavernHelper, makeGenerationId, stopGenerationById } from './host-env';
 import { keepSpyAndPublicEntries } from './message-worldbook';
 import { mergeOneShotHint } from './extra-hint';
@@ -184,7 +183,7 @@ export async function generateShopChatReply(args: ShopChatGenerateArgs): Promise
   const userText = composeShopUserText(shopTrailingUserBatch(thread.messages));
   const mergedExtra = mergeOneShotHint(String(settings.extraPrompt || ''), args.extraHint);
   const chronicleBlocks = readChronicleDossierBlocks([roster.protagonistName || '我'], Number(settings.summaryCount) || 5);
-  const storyText = stripWithContextConfig(readAiChatHistory(Number(settings.chatHistoryCount) || 5));
+  const storyText = readStrippedAiChatHistory(Number(settings.chatHistoryCount) || 5);
 
   const active = isCurrencyLinkActive();
   const currencies = active

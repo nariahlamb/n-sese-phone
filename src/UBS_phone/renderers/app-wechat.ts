@@ -62,11 +62,10 @@ import {
   type PhoneLogEntry,
   type PhoneMessage,
 } from '../core/chat-model';
-import { abortPhoneGeneration, generateConversationReply, PhoneChatError, readAiChatHistory } from '../core/chat-engine';
+import { abortPhoneGeneration, generateConversationReply, PhoneChatError, readStrippedAiChatHistory } from '../core/chat-engine';
 import { generatePhoneImage, getImageError, MAX_AUTO_IMAGES_PER_BATCH } from '../core/chat-images';
 import { buildPhoneChatContext, collectChatSubjects } from '../core/chat-image-prompts';
 import { readPhoneMapLocations, type PhoneMapLocation } from '../core/map-locations';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { buildMemoDraft, deletePhoneMemoByTitle, insertPhoneMemo, memoTitleFromBubbleText } from '../core/phone-memo';
 import { invalidatePhoneScheduleCache } from '../core/phone-schedule';
 import { addPhoneAlbumEntries, makeAlbumEntryId, syncAlbumEntryForMessageImage } from '../core/phone-album';
@@ -4187,7 +4186,7 @@ async function startImageJob(convId: string, messageId: string): Promise<void> {
     const pickedLocation = msg.imageLocationId
       ? (await readPhoneMapLocations()).find(l => l.nodeId === msg.imageLocationId) || null
       : null;
-    const storyContext = pickedSubjects && msg.imageStoryCtx ? stripWithContextConfig(readAiChatHistory(1)) : '';
+    const storyContext = pickedSubjects && msg.imageStoryCtx ? readStrippedAiChatHistory(1) : '';
     const path = await generatePhoneImage({
       messageId,
       description: msg.content,

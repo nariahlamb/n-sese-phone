@@ -1,4 +1,5 @@
 import { parseJsonWith } from './safe-json';
+import { stripContextTags } from './context-strip';
 // ===== 正文插图（自动文生图）：AI 输出解析 + 插入定位 + 正文改写（纯函数） =====
 // 输出契约（见 story-image-prompts.ts 默认要求提示词）：
 //   <UBS_image><UBS_think>…</UBS_think>position: 正文摘录片段\n\nimage###提示词###</UBS_image>
@@ -171,9 +172,7 @@ function clampDescription(raw: unknown): string {
 
 /** 剥离 AI 回复中的思考标签（think/thinking）后供解析。 */
 export function stripThinkingTags(input: string): string {
-  return String(input || '')
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+  return stripContextTags(String(input || ''), ['thinking', 'think', 'reasoning', 'reflection']);
 }
 
 /**

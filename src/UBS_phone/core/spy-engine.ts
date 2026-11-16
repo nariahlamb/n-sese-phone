@@ -16,10 +16,9 @@ import { getConfig } from '../../unified-statusbar/core/config-store';
 import { isHostRefillMode } from './host-config';
 import { keepPhoneRecordEntries } from '../../unified-statusbar/core/worldbook-entry';
 import { readChronicleDossierBlocks } from '../../unified-statusbar/core/chronicle-blocks';
-import { stripWithContextConfig } from '../../unified-statusbar/core/context-strip';
 import { getTavernHelper, hostWindow, makeGenerationId, stopGenerationById } from './host-env';
 import { mergeOneShotHint } from './extra-hint';
-import { PhoneChatError, readAiChatHistory } from './chat-engine';
+import { PhoneChatError, readStrippedAiChatHistory } from './chat-engine';
 import { runPhoneRaw } from './phone-raw';
 import type { PhoneStyle } from './chat-model';
 import { getPhoneSettings } from './phone-settings';
@@ -230,7 +229,7 @@ export async function generateSpyContent(args: SpyGenerateArgs = {}): Promise<Sp
     // ① 素材：纪要（焦点并集、每角色保底取含名纪要）+ 正文上下文（复用世界演化设置）
     const worldCfg = readWorldConfigSafe();
     const chronicleBlocks = readChronicleDossierBlocks(focus, worldCfg.chronicleTotal);
-    const storyText = stripWithContextConfig(readAiChatHistory(worldCfg.contextCount));
+    const storyText = readStrippedAiChatHistory(worldCfg.contextCount);
 
     // 额外要求合并产物（进指令 + 追加进触发注入语料——提示里提到的人名同样激活世界书条目）
     const mergedExtra = mergeOneShotHint(settings.extraPrompt, args.extraHint);
@@ -382,7 +381,7 @@ async function runAutoSpy(): Promise<void> {
   const lastRound = readPhoneDataRef().spy?.lastRound || 0;
   if (round - lastRound < worldCfg.everyTurns) return;
   // 最短回复闸（固定 100 字）：短回复不触发，避免无谓请求
-  const latest = stripWithContextConfig(readAiChatHistory(1));
+  const latest = readStrippedAiChatHistory(1);
   if (latest.replace(/^AI[:：]\s*/, '').trim().length < SPY_AUTO_MIN_REPLY_CHARS) return;
   await generateSpyContent({ reason: 'auto', round });
 }

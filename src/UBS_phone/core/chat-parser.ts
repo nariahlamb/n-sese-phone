@@ -6,6 +6,8 @@ import type { PhoneMessageType } from './chat-model';
 import { MEMO_TYPES, RICH_MEDIA_SPECS, specBranchAllows, type ChatBranch } from './rich-media';
 import { REPLY_CLOSE_TAG, REPLY_OPEN_TAG, lastTagBlock, tagRegex } from './protocol-tags';
 import { truncateText, unescapeBasicEntities } from './ubp-utils';
+import { getConfig } from '../../unified-statusbar/core/config-store';
+import { stripContextTags } from '../../unified-statusbar/core/context-strip';
 
 /** 会话级动作 id（rich-media 注册表 kind='action' 的类型）。 */
 export type ChatActionKind = 'friend-accept' | 'friend-reject' | 'block' | 'leave-group';
@@ -67,24 +69,31 @@ export interface ParseReplyOptions {
 /** 单轮气氛组发言软上限（与 chat-model 规格一致；解析器保持零依赖，故本地常量）。 */
 const MAX_ATMOSPHERE_MESSAGES = 8;
 
-const THINK_CLOSE_RE = /<\/(think|thinking|reasoning|reflection)>/gi;
+const THINKING_STRIP_TAGS = ['thinking', 'think', 'reasoning', 'reflection', 'deep_thinking', 'dream_think', 'thought'];
+const THINK_OPEN_RE = /<\s*(?:think|thinking|reasoning|reflection|deep_thinking|dream_think|thought)(?=[\s/>])[^>]*>/i;
+const THINK_CLOSE_RE = /<\/\s*(?:think|thinking|reasoning|reflection|deep_thinking|dream_think|thought)\s*>/gi;
+const PROTO_BLOCK_START_RE = /<\s*ubp_(?:reply|call|voicemail|spy|social|shop_reply|atmo)\b[^>]*>/i;
 
-/** 剥离模型思考块：取最后一个闭合思考标签之后的内容（兼容多个/嵌套误用）。 */
+/** 剥离模型思考块：栈式清除成对思考块与配置剥离标签；未闭合兜底仅作用于首个 <ubp_*> 之前，不误切正文内部提及的 </think>。 */
 export function stripThinkingBlocks(text: string): string {
-  let out = String(text || '');
+  let configuredStrip: string[] = [];
+  try { configuredStrip = getConfig().contextStripTags || []; } catch (_e) { /* ignore */ }
+  const stripList = Array.from(new Set([...THINKING_STRIP_TAGS, ...configuredStrip]))
+    .filter((t) => !t.startsWith('ubp_'));
+  let out = stripContextTags(String(text || ''), stripList);
+  const protoMatch = PROTO_BLOCK_START_RE.exec(out);
+  const limit = protoMatch ? protoMatch.index : out.length;
+  const head = out.slice(0, limit);
   THINK_CLOSE_RE.lastIndex = 0;
   let lastClose = -1;
   let match: RegExpExecArray | null;
-  while ((match = THINK_CLOSE_RE.exec(out)) !== null) {
+  while ((match = THINK_CLOSE_RE.exec(head)) !== null) {
     lastClose = match.index + match[0].length;
   }
-  if (lastClose >= 0) out = out.slice(lastClose);
-  // 兜底：未闭合的 <think> 开头（吞掉其后所有内容的场景）——其后若还有回复块则保留回复块
-  const openIdx = out.search(/<(think|thinking|reasoning|reflection)>/i);
-  if (openIdx >= 0) {
-    const after = out.slice(openIdx);
-    const replyIdx = after.search(tagRegex(REPLY_OPEN_TAG));
-    if (replyIdx >= 0) out = after.slice(replyIdx);
+  if (lastClose >= 0) {
+    out = out.slice(lastClose);
+  } else if (protoMatch && THINK_OPEN_RE.test(head)) {
+    out = out.slice(protoMatch.index);
   }
   return out.trim();
 }
