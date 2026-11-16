@@ -163,7 +163,7 @@
     "src/unified-statusbar/core/ai-retry.ts": "fcfae4dd5c1d8a815a33796bc86648b09c0f131b14d42fb3076e8ebf7a5f94fc",
     "src/unified-statusbar/core/ai-text-features.ts": "506715d4fb0299248bff4409c5d936ce6440b07fe895c1fe8a53baca7d03c121",
     "src/unified-statusbar/core/ai-tool-shield.ts": "19fc36fe3dc8b6bfbb7b218c7357f63ed18888d909b0a9344e0fc7ac1f4b9459",
-    "src/unified-statusbar/core/api-config.ts": "addc23677c5ee8795720841b8d2c78e772fd225e495a2b959b3d1c864e48f31d",
+    "src/unified-statusbar/core/api-config.ts": "4c3c2771317a3837dd1ea2c2291ec1c5ce191806c1d274c685c11c1ca3c89b94",
     "src/unified-statusbar/core/atomic-envelope-store.ts": "9f2869c41925aa77287603483bc3bf944229c11ba41cfcdaff72ab790dd98533",
     "src/unified-statusbar/core/back-guard.ts": "49077ce55a14f4023515ecb84fee0af276cf18d21796c59f4ba83c06e3a95f84",
     "src/unified-statusbar/core/baibai-bridge.ts": "b6aa4486e9e4f7b2605112840f577f1ce79a7fb5bc4788d765e8a6fe3d6096d2",

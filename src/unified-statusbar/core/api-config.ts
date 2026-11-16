@@ -260,26 +260,30 @@ export async function fetchModelList(apiurl: string, key?: string, source?: Cust
     return await invoke(trimmed);
   }
 
-  let firstErr: unknown = null;
-  if (typeof fn === 'function') {
-    try {
-      return await invoke(trimmed);
-    } catch (e) {
-      firstErr = e;
-      if (!/\/v\d+(?:\/|$)/i.test(trimmed)) {
-        try {
-          return await invoke(`${trimmed}/v1`);
-        } catch (_e2) { /* 继续尝试原生 /v1beta/models */ }
-      }
-    }
-  }
+  // makersuite 绝不能把不带 /v1 的根地址直接交给 TavernHelper.getModelList：
+  // 宿主 OpenAI 路径固定拼 /models，打到 gpt-load 等网关会命中管理页 HTML 并触发后端非 JSON 报错弹窗。
+  // 1) 优先直连原生 /v1beta/models?key=...
+  let nativeErr: unknown = null;
   try {
     const models = await fetchGeminiNativeModelList(trimmed, key);
     if (models.length > 0) return models;
-  } catch (_e3) { /* 回退错误提示 */ }
+  } catch (e) {
+    nativeErr = e;
+  }
 
-  const detail = firstErr instanceof Error ? firstErr.message : String(firstErr || '拉取模型失败');
-  throw new Error(`${detail}（原生 Gemini 渠道可跳过加载、直接在上方手输模型名，如 gemini-2.5-flash）`);
+  // 2) 若浏览器端因 CORS/网络失败，且非 Google 官方域名与非 /v1beta 路径，补 /v1 走 OpenAI /v1/models
+  const isOfficialGoogle = /^https?:\/\/generativelanguage\.googleapis\.com(?:\/|$)/i.test(trimmed);
+  if (typeof fn === 'function' && !isOfficialGoogle && !/\/v1beta(?:\/|$)/i.test(trimmed)) {
+    const openAiUrl = /\/v\d+(?:\/|$)/i.test(trimmed) ? trimmed : `${trimmed}/v1`;
+    try {
+      return await invoke(openAiUrl);
+    } catch (e2) {
+      nativeErr = e2;
+    }
+  }
+
+  const detail = nativeErr instanceof Error ? nativeErr.message : String(nativeErr || '拉取模型失败');
+  throw new Error(`${detail}（原生 Gemini 渠道可跳过加载、直接在上方手输模型名，如 gemini-4-hydrogen / gemini-2.5-flash）`);
 }
 
 // ═══════════════════════════════════════════════════════════════

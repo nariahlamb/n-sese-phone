@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.7`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.8`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -116,6 +116,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-17 | `0.1.0-alpha.8` | 同步状态栏 `api-config.ts` 修复：`fetchModelList` 在 `source === 'makersuite'` 时优先直连 `/v1beta/models` 并仅以 `/v1` 回退宿主 `getModelList`，避免裸根地址撞管理页 HTML | `build` / `test` 37 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.7` | `phone-api.ts` 的 `presetToApi` 对齐主项目 `api-config.ts`：透传非 `openai` 的 `source`（`openai` 不显式写）、`top_p` 越界归 `'unset'`、按 `promptPostProcessing` 在 `custom_api` 上登记出站策略（缺失回退 `semi`）；新增 `tests/ai-tool-shield.test.mjs` 锁定上述行为与「`phoneFullSlots()` 含尾部破限 + `semi` 规整后首条对话消息之后无 `system`/`developer`」 | `build` / `test` 37 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.6` | 内嵌 `env.ts` 的 `getToastr()` 统一为小手机全部 toast（含 `phoneNotify` 及内嵌报错）自动加「小手机」前缀；`phone-ui.ts` 统一短名；扩展 `tests/toast-ui.test.mjs` | `build` / `test` 35 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.5` | 小手机屏内 `.ubp-toast` 改为半透明磨砂（`0.52` + `blur(8px)`）与紧凑字号间距；`ai-activity-notify.ts` 新增关闭钮安全缓冲带防误触与单开半透明/大 `×` 兜底样式；新增 `tests/toast-ui.test.mjs` | `build` / `test` 34 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
