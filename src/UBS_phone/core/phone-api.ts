@@ -5,7 +5,12 @@
 
 import type { CustomApiConfig } from '../../unified-statusbar/core/api-config';
 import type { CustomApiPreset } from '../../unified-statusbar/core/constants';
-import { normalizeAiRetryMax } from '../../unified-statusbar/core/constants';
+import {
+  normalizeAiRetryMax,
+  normalizeCustomApiPostProcessingMode,
+  normalizeCustomApiSource,
+} from '../../unified-statusbar/core/constants';
+import { tagCustomApiPostProcessing } from '../../unified-statusbar/core/ai-tool-shield';
 import { withAiRetry, type AiRetryOptions } from '../../unified-statusbar/core/ai-retry';
 import { stripTailSafeBlock } from '../../unified-statusbar/core/ai-parse';
 import { getConfig } from './host-config';
@@ -23,13 +28,18 @@ function presetToApi(preset: CustomApiPreset): CustomApiConfig {
   if (preset.url && preset.url.trim()) cfg.apiurl = preset.url.trim();
   if (preset.key) cfg.key = preset.key;
   if (preset.model && preset.model.trim()) cfg.model = preset.model.trim();
+  // API 源：非 openai 才透传（openai 为 generateRaw 的默认口径，不显式设置）
+  const source = normalizeCustomApiSource(preset.source);
+  if (source !== 'openai') cfg.source = source;
   cfg.max_tokens = preset.maxTokens;
   cfg.temperature = preset.temperature;
   cfg.frequency_penalty = preset.frequencyPenalty;
   cfg.presence_penalty = preset.presencePenalty;
-  cfg.top_p = preset.topP;
+  // top_p 合法区间 (0, 1]（DeepSeek 拒绝 0，报 Invalid top_p value）；越界按 'unset'，与主项目 api-config 一致
+  cfg.top_p = typeof preset.topP === 'number' && (preset.topP <= 0 || preset.topP > 1) ? 'unset' : preset.topP;
   cfg.top_k = preset.topK;
-  return cfg;
+  // 中段 system 兼容策略登记在 custom_api 实例上，出站层（ai-tool-shield）按对象取用
+  return tagCustomApiPostProcessing(cfg, normalizeCustomApiPostProcessingMode(preset.promptPostProcessing));
 }
 
 /** 主项目预设仓库（设置页下拉数据源；主项目未就绪=空列表）。 */

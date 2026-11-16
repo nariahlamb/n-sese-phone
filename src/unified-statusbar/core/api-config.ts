@@ -17,8 +17,15 @@ import { getConfig } from './config-store';
 import { withAiRetry, isAiAbortError, type AiRetryOptions } from './ai-retry';
 export { isAiAbortError };
 import { stripTailSafeBlock } from './ai-parse';
-import { normalizeAiRetryMax, type AiRetryScope } from './constants';
-import type { CustomApiPreset } from './constants';
+import {
+  normalizeAiRetryMax,
+  normalizeCustomApiPostProcessingMode,
+  normalizeCustomApiSource,
+  type AiRetryScope,
+  type CustomApiPreset,
+  type CustomApiSource,
+} from './constants';
+import { tagCustomApiPostProcessing } from './ai-tool-shield';
 
 /** 生成预设唯一标识 */
 export function generatePresetId(): string {
@@ -97,7 +104,8 @@ function presetToCustomApiConfig(preset: CustomApiPreset): CustomApiConfig {
   if (preset.url && preset.url.trim()) cfg.apiurl = preset.url.trim();
   if (preset.key) cfg.key = preset.key;
   if (preset.model && preset.model.trim()) cfg.model = preset.model.trim();
-  // API 源不走预设：统一由 generateRaw 使用默认源（'openai'）。
+  const source = normalizeCustomApiSource(preset.source);
+  if (source !== 'openai') cfg.source = source;
   // 数值类参数：始终传入（含 'unset'），让 generateRaw 决定行为
   cfg.max_tokens = preset.maxTokens;
   cfg.temperature = preset.temperature;
@@ -107,7 +115,7 @@ function presetToCustomApiConfig(preset: CustomApiPreset): CustomApiConfig {
   // 越界值按 'unset' 处理，避免预设里存下的 0 被原样发给上游。
   cfg.top_p = typeof preset.topP === 'number' && (preset.topP <= 0 || preset.topP > 1) ? 'unset' : preset.topP;
   cfg.top_k = preset.topK;
-  return cfg;
+  return tagCustomApiPostProcessing(cfg, normalizeCustomApiPostProcessingMode(preset.promptPostProcessing));
 }
 
 /**
@@ -220,15 +228,58 @@ export function validateAssistantApiConfig(): string | null {
  * @param key API 密钥（可选）
  * @returns 模型名称数组；失败时抛出异常
  */
-export async function fetchModelList(apiurl: string, key?: string): Promise<string[]> {
+async function fetchGeminiNativeModelList(baseUrl: string, key?: string): Promise<string[]> {
+  if (typeof fetch !== 'function') throw new Error('当前环境不支持 fetch');
+  const root = baseUrl.replace(/\/+$/, '').replace(/\/v1beta$/i, '');
+  const qs = key ? `?key=${encodeURIComponent(key)}` : '';
+  const resp = await fetch(`${root}/v1beta/models${qs}`, { method: 'GET' });
+  if (!resp.ok) {
+    throw new Error(`Gemini /v1beta/models 返回 HTTP ${resp.status}`);
+  }
+  const json = await resp.json() as { models?: Array<{ name?: unknown }> };
+  const raw = Array.isArray(json?.models) ? json.models : [];
+  return raw
+    .map(m => (typeof m?.name === 'string' ? m.name.replace(/^models\//, '').trim() : ''))
+    .filter(Boolean);
+}
+
+export async function fetchModelList(apiurl: string, key?: string, source?: CustomApiSource): Promise<string[]> {
   const th = getTavernHelper();
   const fn = th?.getModelList;
-  if (typeof fn !== 'function') {
-    throw new Error('无法访问 getModelList 函数，请检查酒馆助手版本');
+  const trimmed = apiurl.trim().replace(/\/+$/, '');
+  const invoke = async (url: string): Promise<string[]> => {
+    if (typeof fn !== 'function') {
+      throw new Error('无法访问 getModelList 函数，请检查酒馆助手版本');
+    }
+    const params: { apiurl: string; key?: string } = { apiurl: url };
+    if (key) params.key = key;
+    return await fn(params);
+  };
+
+  if (source !== 'makersuite') {
+    return await invoke(trimmed);
   }
-  const params: { apiurl: string; key?: string } = { apiurl: apiurl.trim() };
-  if (key) params.key = key;
-  return await fn(params);
+
+  let firstErr: unknown = null;
+  if (typeof fn === 'function') {
+    try {
+      return await invoke(trimmed);
+    } catch (e) {
+      firstErr = e;
+      if (!/\/v\d+(?:\/|$)/i.test(trimmed)) {
+        try {
+          return await invoke(`${trimmed}/v1`);
+        } catch (_e2) { /* 继续尝试原生 /v1beta/models */ }
+      }
+    }
+  }
+  try {
+    const models = await fetchGeminiNativeModelList(trimmed, key);
+    if (models.length > 0) return models;
+  } catch (_e3) { /* 回退错误提示 */ }
+
+  const detail = firstErr instanceof Error ? firstErr.message : String(firstErr || '拉取模型失败');
+  throw new Error(`${detail}（原生 Gemini 渠道可跳过加载、直接在上方手输模型名，如 gemini-2.5-flash）`);
 }
 
 // ═══════════════════════════════════════════════════════════════

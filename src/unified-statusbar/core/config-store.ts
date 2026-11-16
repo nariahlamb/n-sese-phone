@@ -6,7 +6,7 @@
 //   2. 设备本地临时态：collapse 折叠态等不跨设备同步的状态用 localStorage（ub_device_config_*）。
 // 注意：本文件仅负责「设置偏好」的持久化；_lsGet/_lsSet 提供给外部存放「临时 UI 状态」
 // （如按钮拖拽位置、展开折叠态），这些状态本就是临时的，仍用 localStorage，不需要跨浏览器同步。
-import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_KEEP_TAGS_DEFAULT, CONTEXT_STRIP_TAGS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
+import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, normalizeCustomApiSource, normalizeCustomApiPostProcessingMode, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_KEEP_TAGS_DEFAULT, CONTEXT_STRIP_TAGS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
 import { readLocalJson } from './safe-json';
 import { normalizeJailbreakSlotState } from './jailbreak-presets';
 import { NSFW_GUIDANCE_DEFAULT_CONTEXT_COUNT, NSFW_GUIDANCE_DEFAULT_MAX_CHARS, NSFW_GUIDANCE_DEFAULT_MAX_WORLD_BOOK_ENTRIES, NSFW_GUIDANCE_MAX_WORLD_BOOK_ENTRIES } from './constants';
@@ -980,6 +980,45 @@ function _readSceneApiPreset(val: any): SceneApiPreset | null {
   };
 }
 
+// 读取并归一化单条 CustomApiPreset
+function _readCustomApiPreset(val: any): CustomApiPreset | null {
+  if (!val || typeof val !== 'object') return null;
+  const numOrUnset = (v: any, d: number | 'unset'): number | 'unset' => {
+    if (v === 'unset') return 'unset';
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    return d;
+  };
+  const id = typeof val.id === 'string' ? val.id : '';
+  if (!id) return null;
+  return {
+    id,
+    name: typeof val.name === 'string' ? val.name.trim() : '',
+    url: typeof val.url === 'string' ? val.url : '',
+    key: typeof val.key === 'string' ? val.key : '',
+    model: typeof val.model === 'string' ? val.model : '',
+    source: normalizeCustomApiSource(val.source),
+    promptPostProcessing: normalizeCustomApiPostProcessingMode(val.promptPostProcessing),
+    maxTokens: numOrUnset(val.maxTokens, 'unset'),
+    temperature: numOrUnset(val.temperature, 'unset'),
+    topP: numOrUnset(val.topP, 'unset'),
+    topK: numOrUnset(val.topK, 'unset'),
+    frequencyPenalty: numOrUnset(val.frequencyPenalty, 'unset'),
+    presencePenalty: numOrUnset(val.presencePenalty, 'unset'),
+    createdAt: typeof val.createdAt === 'number' ? val.createdAt : Date.now(),
+  };
+}
+
+// 读取 customApiPresets 数组（仓库）
+function _readCustomApiPresets(val: any): CustomApiPreset[] {
+  if (!Array.isArray(val)) return [];
+  const result: CustomApiPreset[] = [];
+  for (const item of val) {
+    const p = _readCustomApiPreset(item);
+    if (p) result.push(p);
+  }
+  return result;
+}
+
 // 读取 sceneApiPresets 数组（仓库）
 function _readSceneApiPresets(val: any): SceneApiPreset[] {
   if (!Array.isArray(val)) return [];
@@ -1238,7 +1277,7 @@ export function getConfig(): StatusBarConfig {
     popupSettingsFontScale: normalizeUiFontScale(cfg.popupSettingsFontScale),
     apiMode: (cfg.apiMode === 'custom' ? 'custom' : cfg.apiMode === 'per-feature' ? 'per-feature' : 'tavern') as ApiMode,
     customApiKey: typeof cfg.customApiKey === 'string' ? cfg.customApiKey : '',
-    customApiPresets: Array.isArray(cfg.customApiPresets) ? cfg.customApiPresets : [],
+    customApiPresets: _readCustomApiPresets(cfg.customApiPresets),
     activeApiPresetId: typeof cfg.activeApiPresetId === 'string' ? cfg.activeApiPresetId : '',
     investigationApiPresetId: typeof cfg.investigationApiPresetId === 'string' ? cfg.investigationApiPresetId : '',
     calendarApiPresetId: typeof cfg.calendarApiPresetId === 'string' ? cfg.calendarApiPresetId : '',

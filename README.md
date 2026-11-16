@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.6`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.7`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -20,7 +20,7 @@
 
 ---
 
-## 2. 当前改造状态与未完成项（截至 2026-11-15）
+## 2. 当前改造状态与未完成项（截至 2026-11-17）
 
 | 模块 / 功能 | 当前状态 | 关键证据与说明 |
 |---|---|---|
@@ -29,6 +29,7 @@
 | **世界演化联动防轰炸（协同现状）** | ✅ 上游已修（在状态栏仓） | 小手机侧接收端 [world-link.ts](src/UBS_phone/core/world-link.ts) 保持原样（允许陌生人符合直觉、保留正文联动气泡）；强制每轮发独立微信的问题已在状态栏 `0.1.0-alpha.4` 解除并加冷却门控 |
 | **标签剥离分层与短信/电话思考防误伤** | ✅ 代码+单测完成 | 同步 `contextKeepTags`/优先级保护与逐楼独立清洗（`readStrippedAiChatHistory`）；修复 `story-link.ts` 从 `<thinking>` 内误提 `<微信>`/`<通话>` 及 `chat-parser.ts`/`call-parser.ts` 被正文 `</think>` 误截断（`v0.1.0-alpha.4`） |
 | **屏内与进度 Toast 半透明紧凑及防误触** | ✅ 代码+单测完成 | `phone-theme.ts` 屏内 `.ubp-toast` 改为半透明玻璃与缩小尺寸；`ai-activity-notify.ts` 新增贴边防误触转关闭与单开/原版 `30×30` 大 `×` 兜底样式（[phone-theme.ts](src/UBS_phone/styles/phone-theme.ts)、[ai-activity-notify.ts](src/UBS_phone/core/ai-activity-notify.ts) `v0.1.0-alpha.5`） |
+| **API 预设出站兼容（source / top_p / 中段 system）** | ✅ 代码+单测完成 | [phone-api.ts](src/UBS_phone/core/phone-api.ts) 的 `presetToApi` 对齐主项目 `api-config.ts`：非 `openai` 的 `source` 透传（`openai` 不显式写）、`top_p` 越界（`<=0` 或 `>1`，如 DeepSeek 拒收的 `0`）归 `'unset'`、并按预设 `promptPostProcessing` 在 `custom_api` 上登记策略（缺失回退 `semi`）；出站层 `ai-tool-shield` 据此把首条对话消息之后的 `system`/`developer` 降级为 `user`（兼容 gpt-load / Gemini / Claude 网关）。新增 `tests/ai-tool-shield.test.mjs`（`0.1.0-alpha.7`） |
 | **真机回归验收** | ⏳ 待继续验证 | 正文联动气泡渲染 + 手机 TT 双开联跑 + 窥私/消息记录世界书长期运行待真机观察 |
 
 ---
@@ -103,7 +104,7 @@
 
 ```powershell
 npm run build   # esbuild 打包 dist/index.js
-npm test        # node --test tests/*.test.mjs（当前 35 通过 / 2 跳过 / 0 失败）
+npm test        # node --test tests/*.test.mjs（当前 37 通过 / 2 跳过 / 0 失败，共 39）
 npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
 ```
 
@@ -115,6 +116,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-17 | `0.1.0-alpha.7` | `phone-api.ts` 的 `presetToApi` 对齐主项目 `api-config.ts`：透传非 `openai` 的 `source`（`openai` 不显式写）、`top_p` 越界归 `'unset'`、按 `promptPostProcessing` 在 `custom_api` 上登记出站策略（缺失回退 `semi`）；新增 `tests/ai-tool-shield.test.mjs` 锁定上述行为与「`phoneFullSlots()` 含尾部破限 + `semi` 规整后首条对话消息之后无 `system`/`developer`」 | `build` / `test` 37 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.6` | 内嵌 `env.ts` 的 `getToastr()` 统一为小手机全部 toast（含 `phoneNotify` 及内嵌报错）自动加「小手机」前缀；`phone-ui.ts` 统一短名；扩展 `tests/toast-ui.test.mjs` | `build` / `test` 35 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.5` | 小手机屏内 `.ubp-toast` 改为半透明磨砂（`0.52` + `blur(8px)`）与紧凑字号间距；`ai-activity-notify.ts` 新增关闭钮安全缓冲带防误触与单开半透明/大 `×` 兜底样式；新增 `tests/toast-ui.test.mjs` | `build` / `test` 34 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.4` | 同步 `contextKeepTags` 与剥离标签优先级保护；全引擎改用 `readStrippedAiChatHistory` 逐楼独立清洗；`story-link.ts` 提取前剔除思考与非正文块；`chat-parser.ts` `stripThinkingBlocks` 改为栈式清除且绝不误切 `<ubp_*>` 内 `</think>`；新增 `tests/context-strip.test.mjs` | `build` / `test` 32 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |

@@ -333,6 +333,57 @@ export const SCENE_PROFILE_DEFAULT: SceneProfile = {
 };
 
 // ===== 自定义 API 预设 =====
+// API 源（透传至 TavernHelper.generateRaw 的 custom_api.source）。
+export type CustomApiSource =
+  | 'openai'
+  | 'makersuite'
+  | 'claude'
+  | 'openrouter'
+  | 'deepseek'
+  | 'vertexai'
+  | 'xai'
+  | 'custom';
+
+export const CUSTOM_API_SOURCE_DEFAULT: CustomApiSource = 'openai';
+
+export const CUSTOM_API_SOURCE_OPTIONS: ReadonlyArray<{ value: CustomApiSource; label: string }> = [
+  { value: 'openai', label: 'OpenAI 兼容（默认）' },
+  { value: 'makersuite', label: 'Google AI Studio (makersuite)' },
+  { value: 'claude', label: 'Claude (Anthropic)' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'vertexai', label: 'Vertex AI' },
+  { value: 'xai', label: 'xAI (Grok)' },
+  { value: 'custom', label: 'Custom API' },
+];
+
+export function normalizeCustomApiSource(value: unknown): CustomApiSource {
+  const valid: readonly CustomApiSource[] = ['openai', 'makersuite', 'claude', 'openrouter', 'deepseek', 'vertexai', 'xai', 'custom'];
+  return typeof value === 'string' && (valid as readonly string[]).includes(value)
+    ? (value as CustomApiSource)
+    : CUSTOM_API_SOURCE_DEFAULT;
+}
+
+// 出站消息序列兼容策略（在前端出站层直接规整 data.messages，不依赖 ST 后端二次处理）
+export type CustomApiPostProcessingMode = 'semi' | 'strict' | 'merge' | 'single' | 'none';
+
+export const CUSTOM_API_POST_PROCESSING_DEFAULT: CustomApiPostProcessingMode = 'semi';
+
+export const CUSTOM_API_POST_PROCESSING_OPTIONS: ReadonlyArray<{ value: CustomApiPostProcessingMode; label: string }> = [
+  { value: 'semi', label: '半严格：中段 system 转 user（推荐，兼容 Gemini/Claude）' },
+  { value: 'strict', label: '严格：强制对话交替（首条非系统须为 user）' },
+  { value: 'merge', label: '合并相邻同角色（保留所有 system）' },
+  { value: 'single', label: '单一用户消息（全部合并为一条 user）' },
+  { value: 'none', label: '不处理（原样发送）' },
+];
+
+export function normalizeCustomApiPostProcessingMode(value: unknown): CustomApiPostProcessingMode {
+  const valid: readonly CustomApiPostProcessingMode[] = ['semi', 'strict', 'merge', 'single', 'none'];
+  return typeof value === 'string' && (valid as readonly string[]).includes(value)
+    ? (value as CustomApiPostProcessingMode)
+    : CUSTOM_API_POST_PROCESSING_DEFAULT;
+}
+
 // 一组完整的自定义 API 参数快照，用户可保存多个预设并快速切换。
 export interface CustomApiPreset {
   /** 唯一标识 */
@@ -342,6 +393,10 @@ export interface CustomApiPreset {
   url: string;
   key: string;
   model: string;
+  /** API 源（默认 'openai'） */
+  source?: CustomApiSource;
+  /** 中段系统消息兼容策略（默认 'semi'） */
+  promptPostProcessing?: CustomApiPostProcessingMode;
   maxTokens: number | 'unset';
   temperature: number | 'unset';
   topP: number | 'unset';
