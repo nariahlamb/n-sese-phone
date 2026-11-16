@@ -11,6 +11,34 @@ import {
 
 const TOAST_TITLE = '小手机 · AI 请求';
 const AUTO_HIDE_MS = 3000;
+const FALLBACK_STYLE_ID = 'ubp-progress-toast-fallback-css';
+
+// 单开小手机或宿主未启用状态栏通知美化时的兜底样式：半透明、紧凑，并放大关闭到后台的 × 热区。
+const FALLBACK_CSS = `
+#toast-container .toast.ub-progress-toast{
+  max-width:258px !important; width:fit-content !important; min-width:0 !important;
+  padding:5px 40px 6px 26px !important; border-radius:8px !important;
+  font-size:11px !important; line-height:1.38 !important;
+  background-color:rgba(30,36,48,.62) !important;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+#toast-container .toast.ub-progress-toast .toast-title{font-size:11.5px !important; line-height:1.3 !important;}
+#toast-container .toast.ub-progress-toast .toast-message{font-size:11px !important; line-height:1.38 !important;}
+#toast-container .toast.ub-progress-toast .toast-close-button{
+  position:absolute !important; top:2px !important; right:2px !important;
+  width:30px !important; height:30px !important; min-width:30px !important; min-height:30px !important;
+  font-size:18px !important; font-weight:700 !important; line-height:1 !important;
+  opacity:.85 !important; border-radius:6px !important;
+  background:rgba(255,255,255,.14) !important; padding:0 !important;
+  display:flex !important; align-items:center; justify-content:center;
+  z-index:4 !important; touch-action:manipulation;
+}
+#toast-container .toast.ub-progress-toast .toast-close-button::after{
+  content:"" !important; position:absolute !important;
+  top:-4px !important; right:-4px !important; bottom:-8px !important; left:-8px !important;
+  background:transparent !important;
+}
+`;
 
 let _inited = false;
 let _toastEl: any = null;
@@ -18,6 +46,35 @@ let _toastText: Text | null = null;
 
 function _hostDoc(): Document | null {
   try { return (window.parent as any).document || document; } catch (_e) { return document; }
+}
+
+function _ensureFallbackCss(doc: Document | null): void {
+  if (!doc || !doc.head) return;
+  if (doc.getElementById('ub-notify-base-css') || doc.getElementById(FALLBACK_STYLE_ID)) return;
+  try {
+    const style = doc.createElement('style');
+    style.id = FALLBACK_STYLE_ID;
+    style.textContent = FALLBACK_CSS;
+    doc.head.appendChild(style);
+  } catch (_e) { /* ignore */ }
+}
+
+function _handleCloseGuard(ev: Event, node: HTMLElement): boolean {
+  const target = ev.target as HTMLElement | null;
+  if (target && target.closest && target.closest('.toast-close-button')) return true;
+  if (typeof MouseEvent !== 'undefined' && ev instanceof MouseEvent) {
+    const closeBtn = node.querySelector?.('.toast-close-button') as HTMLElement | null;
+    if (closeBtn && typeof closeBtn.getBoundingClientRect === 'function') {
+      const r = closeBtn.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && ev.clientX >= r.left - 8 && ev.clientY <= r.bottom + 8) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        closeBtn.click();
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function _toastAlive(el: any): boolean {
@@ -51,6 +108,8 @@ function _noticeText(entries: PhoneAiActivityEntry[]): string {
 function _ensureToast(text: string): void {
   const toastr: any = getToastr();
   if (!toastr || typeof toastr.info !== 'function') return;
+  const doc = _hostDoc();
+  _ensureFallbackCss(doc);
   const persist = getPhoneSettings().aiNoticePersist === true;
   let el: any = null;
   try {
@@ -60,10 +119,10 @@ function _ensureToast(text: string): void {
       tapToDismiss: false,
       closeButton: true,
       progressBar: !persist,
+      extraClasses: 'ub-progress-toast',
     });
   } catch (_e) { return; }
   _toastEl = el;
-  const doc = _hostDoc();
   const container: HTMLElement | undefined = el?.find?.('.toast-message')?.get?.(0);
   if (container && doc) {
     container.textContent = '';
@@ -74,9 +133,14 @@ function _ensureToast(text: string): void {
   }
   const node: HTMLElement | undefined = el?.[0];
   if (node) {
+    node.classList?.add('ub-progress-toast');
+    const closeBtn = node.querySelector?.('.toast-close-button') as HTMLElement | null;
+    if (closeBtn) {
+      closeBtn.setAttribute('aria-label', '只关闭通知（任务在后台继续）');
+      closeBtn.setAttribute('title', '只关闭通知，任务继续在后台运行');
+    }
     node.addEventListener('click', (ev: Event) => {
-      const target = ev.target as HTMLElement | null;
-      if (target && target.closest && target.closest('.toast-close-button')) return;
+      if (_handleCloseGuard(ev, node)) return;
       const list = listPhoneAiActivities().filter(e => e.cancelable && e.phase !== 'terminating');
       if (list.length) cancelPhoneAiActivity(list[0].id);
     });

@@ -1489,19 +1489,20 @@ const PHONE_CSS_RAW = `
    压在面板之下则「面板开着时的提示」（WX-04 点固定三格 →「已在底栏」）用户根本看不见。 */
 .ubp-toastlayer { position: absolute; inset: 0; pointer-events: none; z-index: 95; }
 .ubp-toast {
-  position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 95;
-  background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 12.5px; border-radius: 9px;
-  padding: 8px 14px; pointer-events: none; white-space: normal; max-width: 78%; text-align: center; line-height: 1.45;
+  position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 95;
+  background: rgba(0, 0, 0, 0.52); color: #fff; font-size: 11px; border-radius: 7px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  padding: 5px 10px; pointer-events: none; white-space: normal; max-width: 72%; text-align: center; line-height: 1.35;
 }
 /* 带动作的提示（音色池「已删除 · 撤销」等）：层整体 pointer-events:none，只有这个变体自己接点击 */
 .ubp-toast.act {
-  pointer-events: auto; display: flex; align-items: center; gap: 10px;
-  text-align: left; max-width: 88%; padding: 8px 10px 8px 14px;
+  pointer-events: auto; display: flex; align-items: center; gap: 8px;
+  text-align: left; max-width: 82%; padding: 5px 8px 5px 10px;
 }
 .ubp-toast-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ubp-toast-act {
-  flex: none; border: none; background: transparent; color: var(--ubp-accent); font-size: 12.5px;
-  font-weight: 700; font-family: var(--ubp-font); padding: 2px; cursor: pointer;
+  flex: none; border: none; background: transparent; color: var(--ubp-accent); font-size: 11px;
+  font-weight: 700; font-family: var(--ubp-font); padding: 2px 4px; cursor: pointer;
 }
 
 /* ── 资料卡 ── */

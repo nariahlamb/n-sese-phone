@@ -2,7 +2,7 @@
 
 > **致后续接手本仓库的 AI（强制维护纪律）**
 > 1. **每次修改本仓库代码、正文联动标签协议、世界书投影或对外桥接接口后，必须同步更新本 README**（至少更新「当前改造状态与未完成项」「契约速查」及文末「改造记录」），严禁只改代码不留记录。
-> 2. **先读再改，改完必验**：涉及 `src/` 修改必须同步刷新 `source-files.sha256.json`，重建 `dist/index.js`，并运行 `npm test` 与 `npm run check`。未经用户明确指令，不擅自 `git commit` / `git push`。
+> 2. **先读再改，改完自动推仓（长期明确授权）**：涉及 `src/` 修改必须同步刷新 `source-files.sha256.json`，重建 `dist/index.js`，并运行 `npm test` 与 `npm run check`；全绿后同步递增版本号并**直接 `git commit` 与 `git push origin main`**（无需逐次询问，也不要打包 zip，详见 [AGENTS.md](AGENTS.md)）。
 > 3. **做角色卡联动必看**：第 3 节列出了正文联动全风格标签、世界书防全知条目与 `order`、以及小手机对台账表列的只读依赖。写角色卡时要严格对齐标签名与分隔符。
 
 ---
@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.4`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.5`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -28,6 +28,7 @@
 | **台账只读消费与字段诊断** | ✅ 代码+单测完成 | 优先通过 `SeseLedgerAPI`（回落 `AutoCardUpdaterAPI`）读取表数据并登记字段契约；经历与近期亲密互动口径已对齐（[roster.ts](src/UBS_phone/core/roster.ts)、[field-contracts.ts](src/UBS_phone/core/field-contracts.ts)） |
 | **世界演化联动防轰炸（协同现状）** | ✅ 上游已修（在状态栏仓） | 小手机侧接收端 [world-link.ts](src/UBS_phone/core/world-link.ts) 保持原样（允许陌生人符合直觉、保留正文联动气泡）；强制每轮发独立微信的问题已在状态栏 `0.1.0-alpha.4` 解除并加冷却门控 |
 | **标签剥离分层与短信/电话思考防误伤** | ✅ 代码+单测完成 | 同步 `contextKeepTags`/优先级保护与逐楼独立清洗（`readStrippedAiChatHistory`）；修复 `story-link.ts` 从 `<thinking>` 内误提 `<微信>`/`<通话>` 及 `chat-parser.ts`/`call-parser.ts` 被正文 `</think>` 误截断（`v0.1.0-alpha.4`） |
+| **屏内与进度 Toast 半透明紧凑及防误触** | ✅ 代码+单测完成 | `phone-theme.ts` 屏内 `.ubp-toast` 改为半透明玻璃与缩小尺寸；`ai-activity-notify.ts` 新增贴边防误触转关闭与单开/原版 `30×30` 大 `×` 兜底样式（[phone-theme.ts](src/UBS_phone/styles/phone-theme.ts)、[ai-activity-notify.ts](src/UBS_phone/core/ai-activity-notify.ts) `v0.1.0-alpha.5`） |
 | **真机回归验收** | ⏳ 待继续验证 | 正文联动气泡渲染 + 手机 TT 双开联跑 + 窥私/消息记录世界书长期运行待真机观察 |
 
 ---
@@ -102,7 +103,7 @@
 
 ```powershell
 npm run build   # esbuild 打包 dist/index.js
-npm test        # node --test tests/*.test.mjs（当前 32 通过 / 2 跳过 / 0 失败）
+npm test        # node --test tests/*.test.mjs（当前 34 通过 / 2 跳过 / 0 失败）
 npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
 ```
 
@@ -114,6 +115,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-17 | `0.1.0-alpha.5` | 小手机屏内 `.ubp-toast` 改为半透明磨砂（`0.52` + `blur(8px)`）与紧凑字号间距；`ai-activity-notify.ts` 新增关闭钮安全缓冲带防误触与单开半透明/大 `×` 兜底样式；新增 `tests/toast-ui.test.mjs` | `build` / `test` 34 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.4` | 同步 `contextKeepTags` 与剥离标签优先级保护；全引擎改用 `readStrippedAiChatHistory` 逐楼独立清洗；`story-link.ts` 提取前剔除思考与非正文块；`chat-parser.ts` `stripThinkingBlocks` 改为栈式清除且绝不误切 `<ubp_*>` 内 `</think>`；新增 `tests/context-strip.test.mjs` | `build` / `test` 32 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-15 | `0.1.0-alpha.3` | 同步升级内嵌 `context-strip.ts` 为单遍栈式配对剥离防止误吞正文，并重写本仓 `README.md`（契约索引、改造进展与维护记录铁律） | `build` / `test` 23 通过 2 跳过 / `check` 全绿 |
 | 2026-11-13 | `0.1.0-alpha.2` (`ff44500`) | 解耦桌面端缩放并修复电脑端尺寸及窗口 resize 悬浮球越界 | `build` / `test` / `check` 通过 |

@@ -3,7 +3,7 @@
   "files": {
     "src/README.md": "101dd448c5b46185b0f68a924edce0293b78f49429bacb99a0b51401f0edfd92",
     "src/UBS_phone/README.md": "73cdd2f40354e17a57b73d0b99bfafa5f4df22574f684f04f5c86f31ffdaca72",
-    "src/UBS_phone/core/ai-activity-notify.ts": "9a3e0934130c8edcd05f2129a114c5f1e581f2de48b7c508ade26d903ce59903",
+    "src/UBS_phone/core/ai-activity-notify.ts": "a725e14ff0bd6bd2f6e41635ddf27bd9fe3dbad5701be1476e6ffa849afa78af",
     "src/UBS_phone/core/ai-activity.ts": "cd4a7d17dee60bad83397aec28dd44c0d50159efa8e7de9d0ed2955c16cf0811",
     "src/UBS_phone/core/atmosphere.ts": "024d57d581412341f2fcbc8c60847d864c120964bc4f13869fdc5cccf0ea5003",
     "src/UBS_phone/core/audio-join.ts": "cb4cd08a733e10bf968880de28b074dade4412be61a9cc381953c6f5c1a8fd1d",
@@ -156,7 +156,7 @@
     "src/UBS_phone/renderers/storage-manager-sheet.ts": "37cc585d5f61c4fac5fabd51e89dbfd6405fb111d925cb2393162de0435239d0",
     "src/UBS_phone/renderers/story-link-enhance.ts": "1a4c876ede1bdc2a927c91ffd0efb91226caf84d7145aba712893096eb7bccbd",
     "src/UBS_phone/renderers/voice-meta.ts": "23ed779ac7184200bf69821d41a12927884714939ba0401cfe35f866f9679268",
-    "src/UBS_phone/styles/phone-theme.ts": "d7746d21301637f33e44c295191b28cc9010623afa23cced1930bb2f1cb4c9cc",
+    "src/UBS_phone/styles/phone-theme.ts": "845667e4970df89b5d485b1752013fc85b3ee8711759654c97af1319529bac4e",
     "src/unified-statusbar/core/ai-activity.ts": "bd911f3e82bcd07d70473d295ab332b36322756133cd1d2a3a68827b56346902",
     "src/unified-statusbar/core/ai-parse.ts": "eb998bcfa59ffb9e69cc2eadc9edda8bd80c487d048419e2306c20d4d46039a0",
     "src/unified-statusbar/core/ai-prompt-macros.ts": "228fd2111d369ec32abf48b3a5c36350b7cf438e65c6ae178ed552d48db8a1ca",
