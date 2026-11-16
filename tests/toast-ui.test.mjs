@@ -105,3 +105,38 @@ test('phone ai-activity-notify：点关闭 ×（及安全边沿）不中止任�
     dom.window.close();
   }
 });
+
+test('phone env.getToastr & phoneNotify：小手机通知与报错自动加「小手机」前缀且不重复', async () => {
+  const { getToastr, prefixPhoneToastTitle } = await loadTs('src/unified-statusbar/core/env.ts');
+  assert.equal(prefixPhoneToastTitle(''), '小手机');
+  assert.equal(prefixPhoneToastTitle('瑟瑟小手机'), '小手机');
+  assert.equal(prefixPhoneToastTitle('上传字体'), '小手机 · 上传字体');
+  assert.equal(prefixPhoneToastTitle('小手机 · 语音'), '小手机 · 语音');
+
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
+  const prevWin = globalThis.window;
+  const calls = [];
+  const rawToastr = {
+    error(msg, title) { calls.push(['error', msg, title]); },
+    warning(msg, title) { calls.push(['warning', msg, title]); },
+    info(msg, title) { calls.push(['info', msg, title]); },
+  };
+  dom.window.toastr = rawToastr;
+  globalThis.window = dom.window;
+  try {
+    const wrapped = getToastr();
+    wrapped.error('字体过大', '上传字体');
+    wrapped.warning('没拉到音色', '小手机 · 语音');
+    wrapped.info('恢复完成');
+    rawToastr.error('外部错误', '外部');
+    assert.deepEqual(calls, [
+      ['error', '字体过大', '小手机 · 上传字体'],
+      ['warning', '没拉到音色', '小手机 · 语音'],
+      ['info', '恢复完成', '小手机'],
+      ['error', '外部错误', '外部'],
+    ]);
+  } finally {
+    globalThis.window = prevWin;
+    dom.window.close();
+  }
+});

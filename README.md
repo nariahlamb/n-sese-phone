@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.5`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.6`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -103,7 +103,7 @@
 
 ```powershell
 npm run build   # esbuild 打包 dist/index.js
-npm test        # node --test tests/*.test.mjs（当前 34 通过 / 2 跳过 / 0 失败）
+npm test        # node --test tests/*.test.mjs（当前 35 通过 / 2 跳过 / 0 失败）
 npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
 ```
 
@@ -115,6 +115,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-17 | `0.1.0-alpha.6` | 内嵌 `env.ts` 的 `getToastr()` 统一为小手机全部 toast（含 `phoneNotify` 及内嵌报错）自动加「小手机」前缀；`phone-ui.ts` 统一短名；扩展 `tests/toast-ui.test.mjs` | `build` / `test` 35 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.5` | 小手机屏内 `.ubp-toast` 改为半透明磨砂（`0.52` + `blur(8px)`）与紧凑字号间距；`ai-activity-notify.ts` 新增关闭钮安全缓冲带防误触与单开半透明/大 `×` 兜底样式；新增 `tests/toast-ui.test.mjs` | `build` / `test` 34 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.4` | 同步 `contextKeepTags` 与剥离标签优先级保护；全引擎改用 `readStrippedAiChatHistory` 逐楼独立清洗；`story-link.ts` 提取前剔除思考与非正文块；`chat-parser.ts` `stripThinkingBlocks` 改为栈式清除且绝不误切 `<ubp_*>` 内 `</think>`；新增 `tests/context-strip.test.mjs` | `build` / `test` 32 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-15 | `0.1.0-alpha.3` | 同步升级内嵌 `context-strip.ts` 为单遍栈式配对剥离防止误吞正文，并重写本仓 `README.md`（契约索引、改造进展与维护记录铁律） | `build` / `test` 23 通过 2 跳过 / `check` 全绿 |

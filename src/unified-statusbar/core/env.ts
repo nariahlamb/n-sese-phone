@@ -47,11 +47,45 @@ export function makeGenerationId(prefix: string): string {
   return makeUniqueId(prefix); // U3：委托统一出口（导出保留，行为逐字节不变）
 }
 
-/** toastr 通知全局对象。跨源访问受限时返回 null。 */
+const _wrappedPhoneToastrCache = new WeakMap<object, any>();
+
+/** 为小手机发出的所有 toast 标题统一加「小手机」前缀（不重复叠加）。 */
+export function prefixPhoneToastTitle(title?: unknown): string {
+  const raw = typeof title === 'string' ? title.trim() : '';
+  if (!raw) return '小手机';
+  const cleaned = raw
+    .replace(/^瑟瑟小手机(?:\s*[·•|:\-]\s*|$)/, '')
+    .replace(/^小手机(?:\s*[·•|:\-]\s*|$)/, '')
+    .trim();
+  return cleaned ? `小手机 · ${cleaned}` : '小手机';
+}
+
+function _wrapPhoneToastr(raw: any): any {
+  if (!raw || typeof raw !== 'object') return raw;
+  const cached = _wrappedPhoneToastrCache.get(raw);
+  if (cached) return cached;
+  const wrapped = new Proxy(raw, {
+    get(target, prop, receiver) {
+      if (prop === 'info' || prop === 'success' || prop === 'warning' || prop === 'error') {
+        const orig = Reflect.get(target, prop, target);
+        if (typeof orig !== 'function') return orig;
+        return function (msg: any, title?: any, opts?: any) {
+          return orig.call(target, msg, prefixPhoneToastTitle(title), opts);
+        };
+      }
+      const val = Reflect.get(target, prop, receiver);
+      return typeof val === 'function' ? val.bind(target) : val;
+    },
+  });
+  _wrappedPhoneToastrCache.set(raw, wrapped);
+  return wrapped;
+}
+
+/** toastr 通知全局对象（自动为小手机通知标题加「小手机」前缀；不污染全局原始 window.toastr）。 */
 export function getToastr(): any {
   try {
-    if ((window as any).toastr) return (window as any).toastr;
-    if ((window.parent as any).toastr) return (window.parent as any).toastr;
+    if ((window as any).toastr) return _wrapPhoneToastr((window as any).toastr);
+    if ((window.parent as any).toastr) return _wrapPhoneToastr((window.parent as any).toastr);
   } catch (_e) { /* cross-origin */ }
   return null;
 }

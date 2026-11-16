@@ -273,7 +273,7 @@ export function resetHostFloatBtn(): void {
     reset();
     return;
   }
-  w?.toastr?.error('主项目未就绪，无法重置悬浮按钮', '瑟瑟小手机');
+  w?.toastr?.error('主项目未就绪，无法重置悬浮按钮', '小手机');
 }
 
 /**
