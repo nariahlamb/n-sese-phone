@@ -1,10 +1,11 @@
-// ===== 小手机「裸生成」标准模板（chat / call / social / spy 四个 1A 级请求的唯一事实源） =====
+// ===== 小手机「裸生成」标准模板（chat / call / social / spy 等 1A 级请求的唯一事实源） =====
 //
-// 契约（对齐 CLAUDE.md 与主项目 claude_memory/ai-request-pipeline.md「标准结构」）：
-//   ordered_prompts 全槽位：jailbreak(system) → world_info_before → persona_description
+// 契约（对齐主项目 STANDARD_PROMPT_MIDDLE 净化标准结构）：
+//   ordered_prompts 槽位：jailbreak(system) → world_info_before → persona_description
 //     → char_description → char_personality → scenario → world_info_after
-//     → dialogue_examples → chat_history → user_input
-//   max_chat_history 硬编码 0（原生 chat_history 不带楼层；at_depth 世界书条目仍照常插入）
+//     → dialogue_examples → user_input → jailbreakTail
+//   已移除 'chat_history'：max_chat_history 恒 0，保留 'chat_history' 仍会触发酒馆/TT 塞入
+//   at_depth 世界书条目（如 <场景美化>）；历史与消息资料一律走 after_system 资料块。
 //   user_input = 本功能指令，走 'user_input' 槽位，内容由功能决定，不参与绿灯扫描。
 //   绿灯扫描文本 = 真实酒馆聊天（按全局 scan_depth）+ 触发注入；user_input/资料块不参与。
 //
@@ -38,7 +39,7 @@ export function phoneFullSlots() {
   return [
     ...getJailbreakHeadPrompts({ antiCliche: true }),
     'world_info_before', 'persona_description', 'char_description', 'char_personality',
-    'scenario', 'world_info_after', 'dialogue_examples', 'chat_history', 'user_input',
+    'scenario', 'world_info_after', 'dialogue_examples', 'user_input',
     ...getJailbreakTailPrompts(),
   ] as const;
 }

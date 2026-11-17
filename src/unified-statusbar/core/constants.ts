@@ -416,10 +416,10 @@ export type WeatherCategory = '晴' | '多云' | '阴' | '雨' | '雪' | '雾' |
 export const STYLE_LABELS: Record<StyleType, string> = {
   ancient: '古风灵感',
   flirtatious: '瑟瑟灵感',
-  minimal: '萦绕灵感',
+  minimal: '奶油手账',
   sweet: '甜恋糖果',
   xianxia: '云海仙踪',
-  bridge: '深空舰桥',
+  bridge: '怪盗手记',
   ios: '灵动玻璃',
 };
 
@@ -629,6 +629,35 @@ export const PORTRAIT_DEFAULT_CONTEXT_COUNT = 2;
 /** 默认保留的正文段标签名列表（空=不启用白名单，用户可在 UI 中自行填写如 content、playtxt）。 */
 export const CONTEXT_KEEP_TAGS_DEFAULT: string[] = [];
 export const CONTEXT_STRIP_TAGS_DEFAULT: string[] = ['image'];
+
+// ===== 后台 AI 请求隔离与世界书净化 =====
+/** 默认拦截全局开启的外挂世界书（globalLore）；仅白名单放行的书参与。 */
+export const BG_ISOLATION_BLOCK_GLOBAL_LORE_DEFAULT = true;
+/** 默认拦截角色卡附加世界书（additional）与聊天世界书（chatLore），仅放行角色卡主世界书（primary）及白名单书。 */
+export const BG_ISOLATION_BLOCK_ADDITIONAL_LORE_DEFAULT = true;
+/** 默认过滤 role==='assistant' 的世界书条目（防 <场景美化> 等伪对话条目混入后台请求并引发 semi 空回）。 */
+export const BG_ISOLATION_DROP_ASSISTANT_LORE_DEFAULT = true;
+/** 默认启用内置「正文向核心词根」世界书条目过滤（沿用 shujuku 核心词根，仅作用于用户条目）。 */
+export const BG_ISOLATION_USE_BUILTIN_KEYWORDS_DEFAULT = true;
+/** 默认在出站请求层剥离第三方常驻扩展注入与非我方 assistant 伪插话。 */
+export const BG_ISOLATION_STRIP_FOREIGN_INJECTIONS_DEFAULT = true;
+
+/** 沿用 shujuku-xingv5.2 核心屏蔽词根（仅作用于用户条目，跳过受管族 UBS-/SeseLedger-/[UBS手机]/TavernDB-）：
+ *  - 中文词根：子串包含命中（与 shujuku 一致）
+ *  - 英文词根：非英文字母边界 + 忽略大小写（兼顾 cot/CoT、MVU/mvu、Status/status、Rule/rule、InitVar/initvar，
+ *    同时避免误伤 Cottage / Ruler 等普通英文单词） */
+export const BG_ISOLATION_BUILTIN_ZH_KEYWORDS: readonly string[] = [
+  '规则',
+  '思维链',
+  '变量',
+  '状态',
+  '检定',
+  '判断',
+  '叙事',
+  '文风',
+  '格式',
+];
+export const BG_ISOLATION_BUILTIN_EN_KEYWORD_RE = /(?<![a-z])(?:cot|mvu|status|rule|initvar)(?![a-z])/i;
 
 // ===== 标准情绪词表（立绘标签/筛选/编辑共用）=====
 // 来源：emotionConfigAncient 与 emotionConfigModern 的 key 并集（两套词表一致，并集去重）。

@@ -247,24 +247,147 @@ export function isOurGenerateData(data: any, fp: RequestFingerprint | null): boo
 /** 末条消息尾部的第三方工具调用指令（如 emit_complete_response_* 追加的调用要求）。 */
 const TOOL_CALL_INSTRUCTION_TAIL = /\n+Call the `[A-Za-z0-9_.-]{6,}` function exactly once\b[\s\S]*$/;
 
+export interface OutboundIsolationOptions {
+  /** 是否在指纹命中后剥离非我方注入（stray assistant 伪插话 + 第三方 extensionPrompts）；默认 false。 */
+  stripForeignInjections?: boolean;
+  /** ordered_prompts 中我方合法携带的 assistant 正文集合（trim 后）。 */
+  expectedAssistantContents?: ReadonlySet<string>;
+  /** 请求是否显式携带了非零历史的 chat_history（为 true 时保留历史 assistant）。 */
+  allowHistoryAssistant?: boolean;
+  /** 当前请求自身的 user_input 正文（防止误伤玩家剧情里恰好出现的文字）。 */
+  rawUserInput?: string;
+  /** 从 SillyTavern.extensionPrompts 读取到的第三方常驻注入正文集合（trim 后）。 */
+  foreignExtensionValues?: ReadonlySet<string>;
+}
+
 export interface ScrubResult {
   touched: boolean;
   removedTools: string[];
   strippedInstruction: boolean;
+  removedForeignInjections: number;
+}
+
+let _foreignStripProvider: (() => boolean) | null = null;
+
+/** 注册运行期「出站剥离非我方注入」开关读取器（由 config-store 注册，避免循环依赖）。 */
+export function setShieldForeignStripProvider(fn: (() => boolean) | null): void {
+  _foreignStripProvider = fn;
+}
+
+function isForeignStripEnabled(): boolean {
+  if (!_foreignStripProvider) return true;
+  try {
+    return _foreignStripProvider() !== false;
+  } catch (_e) {
+    return true;
+  }
+}
+
+const OUR_EXTENSION_PROMPT_PREFIXES = ['ub_', 'sl_', 'ubp_', 'unified_statusbar', 'sese_ledger', 'ubs_phone'];
+
+function collectExpectedAssistantContents(request: any): Set<string> {
+  const out = new Set<string>();
+  const list = request?.ordered_prompts;
+  if (!Array.isArray(list)) return out;
+  for (const item of list) {
+    if (item && typeof item === 'object' && item.role === 'assistant' && typeof item.content === 'string') {
+      const trimmed = item.content.trim();
+      if (trimmed) out.add(trimmed);
+    }
+  }
+  return out;
+}
+
+function collectForeignExtensionValues(): Set<string> {
+  const out = new Set<string>();
+  try {
+    const extPrompts = detectSillyTavernContext()?.extensionPrompts;
+    if (!extPrompts || typeof extPrompts !== 'object') return out;
+    for (const [key, entry] of Object.entries<any>(extPrompts)) {
+      if (OUR_EXTENSION_PROMPT_PREFIXES.some(p => key.startsWith(p))) continue;
+      const val = typeof entry === 'string' ? entry.trim() : typeof entry?.value === 'string' ? entry.value.trim() : '';
+      if (val.length >= 12) out.add(val);
+    }
+  } catch (_e) {
+    /* ignore */
+  }
+  return out;
+}
+
+function filterForeignMessages(
+  messages: any[],
+  opts: OutboundIsolationOptions,
+): { messages: any[]; removed: number } {
+  let removed = 0;
+  const expectedAssistants = opts.expectedAssistantContents;
+  const foreignSet = opts.foreignExtensionValues;
+  const rawUserInputTrimmed = typeof opts.rawUserInput === 'string' ? opts.rawUserInput.trim() : '';
+  const out: any[] = [];
+  for (let idx = 0; idx < messages.length; idx++) {
+    const msg = messages[idx];
+    if (!msg || typeof msg !== 'object') {
+      out.push(msg);
+      continue;
+    }
+    if (
+      msg.role === 'assistant' &&
+      !opts.allowHistoryAssistant &&
+      !hasSpecialPayload(msg) &&
+      typeof msg.content === 'string'
+    ) {
+      const trimmed = msg.content.trim();
+      if (!expectedAssistants?.has(trimmed)) {
+        removed += 1;
+        continue;
+      }
+    }
+    if (foreignSet && foreignSet.size > 0 && typeof msg.content === 'string' && !hasSpecialPayload(msg)) {
+      const trimmed = msg.content.trim();
+      if (trimmed && (!rawUserInputTrimmed || trimmed !== rawUserInputTrimmed)) {
+        if (foreignSet.has(trimmed)) {
+          removed += 1;
+          continue;
+        }
+        // ST 部分扩展注入会被并入 system 消息段：仅对长度 >= 32 且非首条/非 user_input 的整段匹配做移除
+        if (idx > 0 && msg.role === 'system') {
+          let updated = msg.content;
+          let matchedInBlock = false;
+          for (const foreign of foreignSet) {
+            if (foreign.length >= 32 && updated.includes(foreign)) {
+              updated = updated.split(foreign).join('').replace(/\n{3,}/g, '\n\n').trim();
+              matchedInBlock = true;
+            }
+          }
+          if (matchedInBlock) {
+            removed += 1;
+            if (!updated) continue;
+            out.push({ ...msg, content: updated });
+            continue;
+          }
+        }
+      }
+    }
+    out.push(msg);
+  }
+  return { messages: out, removed };
 }
 
 /**
  * 对事件负载执行剥离与消息序列规整（仅当指纹命中）。纯逻辑、原地修改 data：
- *   delete tools/tool_choice；custom_prompt_post_processing 置 ''；剥末条消息尾部工具指令；
- *   按 postMode 规整 data.messages / data.prompt。
+ *   delete tools/tool_choice；custom_prompt_post_processing 置 ''；
+ *   可选剥离非我方注入（stray assistant 伪插话 + 第三方 extensionPrompts）；
+ *   剥末条消息尾部工具指令；按 postMode 规整 data.messages / data.prompt。
  * 未命中（宿主/他脚本请求）原样返回 {touched:false}，一个字节都不改。
  */
 export function scrubGenerateData(
   data: any,
   fp: RequestFingerprint | null,
   postMode: CustomApiPostProcessingMode = 'none',
+  isolationOpts?: OutboundIsolationOptions,
 ): ScrubResult {
-  if (!isOurGenerateData(data, fp)) return { touched: false, removedTools: [], strippedInstruction: false };
+  if (!isOurGenerateData(data, fp)) {
+    return { touched: false, removedTools: [], strippedInstruction: false, removedForeignInjections: 0 };
+  }
   const removedTools: string[] = [];
   if (Array.isArray(data.tools)) {
     for (const t of data.tools) removedTools.push(String(t?.function?.name ?? t?.name ?? 'unknown'));
@@ -272,6 +395,18 @@ export function scrubGenerateData(
   }
   if ('tool_choice' in data) delete data.tool_choice;
   data.custom_prompt_post_processing = '';
+  let removedForeignInjections = 0;
+  if (isolationOpts?.stripForeignInjections) {
+    if (Array.isArray(data.messages)) {
+      const res = filterForeignMessages(data.messages, isolationOpts);
+      data.messages = res.messages;
+      removedForeignInjections = res.removed;
+    } else if (Array.isArray(data.prompt)) {
+      const res = filterForeignMessages(data.prompt, isolationOpts);
+      data.prompt = res.messages;
+      removedForeignInjections = res.removed;
+    }
+  }
   let strippedInstruction = false;
   const messages = extractMessages(data);
   const last = messages[messages.length - 1];
@@ -286,7 +421,7 @@ export function scrubGenerateData(
       data.prompt = normalizeOutboundMessages(data.prompt, postMode);
     }
   }
-  return { touched: true, removedTools, strippedInstruction };
+  return { touched: true, removedTools, strippedInstruction, removedForeignInjections };
 }
 
 /** 事件总线（生产环境自动探测；测试可注入桩）。导入期不触碰 window。 */
@@ -359,11 +494,26 @@ export function createShieldedGenerateRaw(
     const fp = buildRequestFingerprint(prepared);
     if (!bus || !fp) return rawFn(prepared);
     const postMode = resolveShieldPostProcessingMode(prepared, hostPostSetting);
+    const stripForeign = isForeignStripEnabled();
+    const isolationOpts: OutboundIsolationOptions | undefined = stripForeign
+      ? {
+          stripForeignInjections: true,
+          expectedAssistantContents: collectExpectedAssistantContents(prepared),
+          allowHistoryAssistant: Array.isArray(prepared?.ordered_prompts)
+            && prepared.ordered_prompts.includes('chat_history')
+            && Number(prepared?.max_chat_history) > 0,
+          rawUserInput: typeof prepared?.user_input === 'string' ? prepared.user_input : undefined,
+          foreignExtensionValues: collectForeignExtensionValues(),
+        }
+      : undefined;
     const handler = (data: any) => {
       try {
-        const result = scrubGenerateData(data, fp, postMode);
+        const result = scrubGenerateData(data, fp, postMode, isolationOpts);
         if (result.removedTools.length > 0 || result.strippedInstruction) {
           console.log('[统一状态栏] 已剥离宿主工具注入（' + result.removedTools.join('、') + '）');
+        }
+        if (result.removedForeignInjections > 0) {
+          console.log(`[统一状态栏] 已净化出站残留非我方注入（${result.removedForeignInjections} 条）`);
         }
       } catch (_e) {
         /* 剥离失败不阻断请求 */

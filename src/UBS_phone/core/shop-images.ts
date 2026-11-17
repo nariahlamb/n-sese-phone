@@ -98,6 +98,7 @@ async function translateItemTags(item: ShopItem): Promise<string> {
     should_silence: true,
     user_input: built.userInput,
     ordered_prompts: orderedPrompts,
+    max_chat_history: 0,
     custom_api: getCustomApiConfig('imageGeneration'),
   }));
   const tags = clampShopTags(parseShopItemTags(typeof result === 'string' ? result : ''));
@@ -127,6 +128,7 @@ async function translateItemsTagsBatch(items: readonly ShopItem[]): Promise<Map<
     should_silence: true,
     user_input: built.userInput,
     ordered_prompts: orderedPrompts,
+    max_chat_history: 0,
     custom_api: getCustomApiConfig('imageGeneration'),
   }));
   const tags = parseShopBatchTags(typeof result === 'string' ? result : '', items.length);

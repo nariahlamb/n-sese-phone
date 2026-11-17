@@ -6,7 +6,9 @@
 //   2. 设备本地临时态：collapse 折叠态等不跨设备同步的状态用 localStorage（ub_device_config_*）。
 // 注意：本文件仅负责「设置偏好」的持久化；_lsGet/_lsSet 提供给外部存放「临时 UI 状态」
 // （如按钮拖拽位置、展开折叠态），这些状态本就是临时的，仍用 localStorage，不需要跨浏览器同步。
-import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, normalizeCustomApiSource, normalizeCustomApiPostProcessingMode, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_KEEP_TAGS_DEFAULT, CONTEXT_STRIP_TAGS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
+import { type StyleType, type PositionMode, type WidthMode, type CollapseBtnStyle, type AiRetryScope, CUSTOM_WIDTH_DEFAULT, CUSTOM_HEIGHT_DEFAULT, CUSTOM_SIZE_PERCENT_MIN, INVESTIGATION_DEFAULT_CONTEXT_COUNT, INVESTIGATION_DEFAULT_MAX_SUMMARY_COUNT, CALENDAR_DEFAULT_CONTEXT_COUNT, type ApiMode, type CustomApiPreset, normalizeCustomApiSource, normalizeCustomApiPostProcessingMode, type SceneMode, type SceneProfile, type SceneApiPreset, SCENE_PROFILE_DEFAULT, API_MODE_DEFAULT, normalizePromptPostProcessing, MAP_DEFAULT_CONTEXT_COUNT, MAP_DEFAULT_MAX_ENTRIES, SKILL_DEFAULT_CONTEXT_COUNT, SKILL_DEFAULT_MAX_WB_ENTRIES, SHOP_STORY_DEFAULT_CONTEXT_COUNT, PORTRAIT_DEFAULT_CONTEXT_COUNT, CONTEXT_KEEP_TAGS_DEFAULT, CONTEXT_STRIP_TAGS_DEFAULT, BG_ISOLATION_BLOCK_GLOBAL_LORE_DEFAULT, BG_ISOLATION_BLOCK_ADDITIONAL_LORE_DEFAULT, BG_ISOLATION_DROP_ASSISTANT_LORE_DEFAULT, BG_ISOLATION_USE_BUILTIN_KEYWORDS_DEFAULT, BG_ISOLATION_STRIP_FOREIGN_INJECTIONS_DEFAULT, AI_RETRY_MAX_DEFAULT, normalizeAiRetryMax, normalizeAiRetryScopes, type JailbreakSlotState, createJailbreakSlotState } from './constants';
+import { setShieldForeignStripProvider } from './ai-tool-shield';
+import type { SkillProseMode } from './skill-types';
 import { readLocalJson } from './safe-json';
 import { normalizeJailbreakSlotState } from './jailbreak-presets';
 import { NSFW_GUIDANCE_DEFAULT_CONTEXT_COUNT, NSFW_GUIDANCE_DEFAULT_MAX_CHARS, NSFW_GUIDANCE_DEFAULT_MAX_WORLD_BOOK_ENTRIES, NSFW_GUIDANCE_MAX_WORLD_BOOK_ENTRIES } from './constants';
@@ -192,6 +194,8 @@ export interface StatusBarConfig {
   mapContextCount: number;
   mapMaxEntries: number;
   skillEnabled: boolean;
+  /** 「主角当前技能」条目的正文模式：tag=要求正文标注发动/新增（旧行为）；reference=仅作设定参考（默认）；off=不注入正文。仅 skillEnabled 开启时生效。 */
+  skillProseMode: SkillProseMode;
   skillContextCount: number;
   skillMaxWorldbookEntries: number;
   /** 地图自动更新模式：off=不自动更新 / new-location=到达新地点时 / location-change=地点变换时 / every-turn=每轮都更新 */
@@ -311,6 +315,19 @@ export interface StatusBarConfig {
    *  世界书装载中被剔除——不进提示词、不参与绿灯扫描，蓝灯常亮一并剔除，底账不改。
    *  空数组 = 关闭。默认 []。 */
   entryBlacklist: string[];
+  // ===== 后台 AI 请求隔离与世界书净化 =====
+  /** 默认拦截全局外挂世界书（globalLore）；仅 bgIsolationAllowedBooks 白名单放行。默认 true。 */
+  bgIsolationBlockGlobalLore: boolean;
+  /** 默认拦截角色卡附加世界书（additional）与聊天世界书（chatLore），仅放行角色卡主世界书（primary）及白名单书。默认 true。 */
+  bgIsolationBlockAdditionalLore: boolean;
+  /** 默认过滤 role==='assistant' 的世界书条目（防 <场景美化> 等伪对话条目混入并引发 semi 空回）。默认 true。 */
+  bgIsolationDropAssistantLore: boolean;
+  /** 默认启用沿用 shujuku 核心词根的内置正文向世界书条目过滤（仅作用于用户条目，跳过受管族）。默认 true。 */
+  bgIsolationUseBuiltinKeywords: boolean;
+  /** 默认在出站请求层剥离第三方常驻扩展注入与 stray assistant 伪插话。默认 true。 */
+  bgIsolationStripForeignInjections: boolean;
+  /** 后台 AI 放行世界书白名单（精确书名列表；填入的全局/附加/聊天世界书不受外挂书屏蔽）。默认 []。 */
+  bgIsolationAllowedBooks: string[];
   // ===== 表格分组模式 =====
   /** 表格分组模式：grouped=各表用预设分组（部分1部分2）/ flat=所有未关闭表统一归分组1。
    *  影响「表格」tab 的批量切换，以及单独「开启」某张表时落入的分组（flat→1，grouped→预设）。
@@ -360,7 +377,7 @@ const DEFAULT_CONFIG: StatusBarConfig = {
   playCollapsed: false,
   darkTheme: false,
   panelColorMode: 'plugin',
-  nsfwPlayEnabled: true,
+  nsfwPlayEnabled: false,
   nsfwPlayAutoClear: false,
   nsfwPlayWorldbookPosition: 'at_depth',
   nsfwPlayWorldbookDepth: 0,
@@ -437,6 +454,7 @@ const DEFAULT_CONFIG: StatusBarConfig = {
   mapContextCount: MAP_DEFAULT_CONTEXT_COUNT,
   mapMaxEntries: MAP_DEFAULT_MAX_ENTRIES,
   skillEnabled: false,
+  skillProseMode: 'reference',
   skillContextCount: SKILL_DEFAULT_CONTEXT_COUNT,
   skillMaxWorldbookEntries: SKILL_DEFAULT_MAX_WB_ENTRIES,
   mapAutoUpdateMode: 'off',
@@ -493,6 +511,12 @@ const DEFAULT_CONFIG: StatusBarConfig = {
   contextKeepTags: [...CONTEXT_KEEP_TAGS_DEFAULT],
   contextStripTags: [...CONTEXT_STRIP_TAGS_DEFAULT],
   entryBlacklist: [],
+  bgIsolationBlockGlobalLore: BG_ISOLATION_BLOCK_GLOBAL_LORE_DEFAULT,
+  bgIsolationBlockAdditionalLore: BG_ISOLATION_BLOCK_ADDITIONAL_LORE_DEFAULT,
+  bgIsolationDropAssistantLore: BG_ISOLATION_DROP_ASSISTANT_LORE_DEFAULT,
+  bgIsolationUseBuiltinKeywords: BG_ISOLATION_USE_BUILTIN_KEYWORDS_DEFAULT,
+  bgIsolationStripForeignInjections: BG_ISOLATION_STRIP_FOREIGN_INJECTIONS_DEFAULT,
+  bgIsolationAllowedBooks: [],
   tableGroupMode: 'flat',
   itemUseEnabled: false,
   gachaSelectedPoolIds: null,
@@ -1118,7 +1142,7 @@ export function getConfig(): StatusBarConfig {
     playCollapsed: cfg.playCollapsed === true,
     darkTheme: cfg.darkTheme === true,
     panelColorMode: cfg.panelColorMode === 'tavern' ? 'tavern' : 'plugin',
-    nsfwPlayEnabled: cfg.nsfwPlayEnabled !== false,
+    nsfwPlayEnabled: cfg.nsfwPlayEnabled === true,
     nsfwPlayAutoClear: cfg.nsfwPlayAutoClear === true,
     nsfwPlayWorldbookPosition: (function() {
       const v = cfg.nsfwPlayWorldbookPosition;
@@ -1218,6 +1242,7 @@ export function getConfig(): StatusBarConfig {
     mapContextCount: typeof cfg.mapContextCount === 'number' && cfg.mapContextCount > 0 ? Math.floor(cfg.mapContextCount) : MAP_DEFAULT_CONTEXT_COUNT,
     mapMaxEntries: typeof cfg.mapMaxEntries === 'number' && cfg.mapMaxEntries > 0 ? Math.floor(cfg.mapMaxEntries) : MAP_DEFAULT_MAX_ENTRIES,
     skillEnabled: cfg.skillEnabled === true,
+    skillProseMode: cfg.skillProseMode === 'tag' || cfg.skillProseMode === 'off' ? cfg.skillProseMode : 'reference',
     skillContextCount: typeof cfg.skillContextCount === 'number' && cfg.skillContextCount > 0 ? Math.min(20, Math.max(1, Math.floor(cfg.skillContextCount))) : SKILL_DEFAULT_CONTEXT_COUNT,
     skillMaxWorldbookEntries: typeof cfg.skillMaxWorldbookEntries === 'number' && cfg.skillMaxWorldbookEntries > 0 ? Math.min(50, Math.max(1, Math.floor(cfg.skillMaxWorldbookEntries))) : SKILL_DEFAULT_MAX_WB_ENTRIES,
     mapAutoUpdateMode: (() => {
@@ -1319,6 +1344,12 @@ export function getConfig(): StatusBarConfig {
     contextKeepTags: _readContextKeepTags(cfg.contextKeepTags),
     contextStripTags: _readContextStripTags(cfg.contextStripTags),
     entryBlacklist: _readEntryBlacklist(cfg.entryBlacklist),
+    bgIsolationBlockGlobalLore: cfg.bgIsolationBlockGlobalLore !== false,
+    bgIsolationBlockAdditionalLore: cfg.bgIsolationBlockAdditionalLore !== false,
+    bgIsolationDropAssistantLore: cfg.bgIsolationDropAssistantLore !== false,
+    bgIsolationUseBuiltinKeywords: cfg.bgIsolationUseBuiltinKeywords !== false,
+    bgIsolationStripForeignInjections: cfg.bgIsolationStripForeignInjections !== false,
+    bgIsolationAllowedBooks: _readEntryBlacklist(cfg.bgIsolationAllowedBooks),
     tableGroupMode: cfg.tableGroupMode === 'grouped' ? 'grouped' : 'flat',
     itemUseEnabled: cfg.itemUseEnabled === true,
     gachaSelectedPoolIds: Array.isArray(cfg.gachaSelectedPoolIds)
@@ -1383,6 +1414,9 @@ export function setConfig<K extends keyof StatusBarConfig>(key: K, value: Status
 export function invalidateConfigCache(): void {
   _configCache = null;
 }
+
+// 注册出站盾的「剥离非我方注入」开关读取器，避免 ai-tool-shield 反向 import config-store 成环。
+setShieldForeignStripProvider(() => getConfig().bgIsolationStripForeignInjections !== false);
 
 // ===== 通用 localStorage 工具（供 index.ts 中非配置类临时状态使用） =====
 export function _lsGet(k: string): string | null {

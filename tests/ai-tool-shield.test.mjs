@@ -83,8 +83,9 @@ test('resolvePhoneApi：非 openai 源透传、openai 不设 source、top_p=0 �
   assert.equal(getCustomApiPostProcessingMode(bad.api), 'semi');
 });
 
-test('phoneFullSlots 含尾部破限；semi 规整后首条对话消息之后不得残留 system/developer', () => {
+test('phoneFullSlots 不含 chat_history 且含尾部破限；semi 规整后首条对话消息之后不得残留 system/developer', () => {
   const slots = phoneFullSlots();
+  assert.equal(slots.includes('chat_history'), false, 'phoneFullSlots 不得再包含 chat_history');
   const uiIdx = slots.indexOf('user_input');
   assert.ok(uiIdx > 0, 'user_input 槽位须位于尾部破限之前');
 
@@ -96,11 +97,11 @@ test('phoneFullSlots 含尾部破限；semi 规整后首条对话消息之后不
     assert.ok(typeof entry.content === 'string' && entry.content.trim() !== '', '尾部破限内容不得为空');
   }
 
-  // 按真实出站形态还原消息序列：对象槽位用自身 role，字符串槽位（world_info/chat_history 等）
-  // 在宿主侧展开为 system（资料块）或 user/assistant（楼层）；此处只需保证首条为 system 头。
+  // 按真实出站形态还原消息序列：对象槽位用自身 role，字符串槽位（world_info_* 等）
+  // 在宿主侧展开为 system（资料块）或 user（user_input）；此处只需保证首条为 system 头。
   const messages = slots.map(entry => (
     typeof entry === 'string'
-      ? { role: entry === 'user_input' || entry === 'chat_history' ? 'user' : 'system', content: '§' + entry }
+      ? { role: entry === 'user_input' ? 'user' : 'system', content: '§' + entry }
       : { role: entry.role, content: entry.content }
   ));
   messages.splice(uiIdx + 1, 0, { role: 'assistant', content: '上一条回复' });
@@ -138,4 +139,62 @@ test('phoneFullSlots 含尾部破限；semi 规整后首条对话消息之后不
   const untouched = scrubGenerateData(foreign, fp, 'semi');
   assert.equal(untouched.touched, false);
   assert.deepEqual(foreign.messages.map(m => m.role), ['system', 'user']);
+});
+
+test('phoneScanOptions + withNativeScanWorldbook：屏蔽外挂书/assistant/shujuku词根，同时放行 keep 手机记录族', async () => {
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
+  const prevWin = globalThis.window;
+  const listeners = new Map();
+  dom.window.SillyTavern = {
+    getContext: () => ({
+      eventSource: { on(evt, fn) { listeners.set(evt, fn); } },
+    }),
+  };
+  dom.window.TavernHelper = {
+    getCharWorldbookNames: () => ({ primary: '主书', additional: ['附加美化书'] }),
+    getWorldbook: async (name) => name === '附加美化书' ? [{ uid: 5, comment: '附加', content: 'x' }] : [],
+  };
+  globalThis.window = dom.window;
+
+  try {
+    const phoneMod = await loadTsBundle(`
+      export { phoneScanOptions } from './src/UBS_phone/core/phone-raw.ts';
+      export {
+        withNativeScanWorldbook,
+        keepSpyRecordEntries,
+        __setBackgroundIsolationForTests,
+      } from './src/unified-statusbar/core/worldbook-entry.ts';
+    `, 'phone-bg-isolation.ts');
+    phoneMod.__setBackgroundIsolationForTests({
+      blockGlobalLore: true,
+      blockAdditionalLore: true,
+      dropAssistantLore: true,
+      useBuiltinKeywords: true,
+      allowedBooks: [],
+    });
+
+    const payload = {
+      globalLore: [{ uid: 9, world: '全局书', comment: '#状态栏', content: '全局垃圾' }],
+      characterLore: [
+        { uid: 1, world: '主书', comment: '角色设定-苏晴', content: '主设定' },
+        { uid: 2, world: '主书', comment: '正文文风规范', content: '词根拦截' },
+        { uid: 3, world: '主书', comment: '<场景美化>', position: { role: 'assistant' }, content: 'HTML' },
+        { uid: 4, world: '主书', comment: '[UBS手机]窥私记录-苏晴', content: '手机窥私族应放行' },
+        { uid: 5, world: '主书', comment: '[UBS手机]正文联动格式', content: '联动格式条目应剔除' },
+        { uid: 6, world: '附加美化书', comment: '附加设定', content: '附加书剔除' },
+      ],
+      chatLore: [],
+      personaLore: [],
+    };
+    await phoneMod.withNativeScanWorldbook(phoneMod.phoneScanOptions(phoneMod.keepSpyRecordEntries), async () => {
+      await listeners.get('worldinfo_entries_loaded')?.(payload);
+    });
+
+    assert.deepEqual(payload.globalLore, []);
+    assert.deepEqual(payload.characterLore.map(e => e.comment), ['角色设定-苏晴', '[UBS手机]窥私记录-苏晴']);
+  } finally {
+    globalThis.window = prevWin;
+    dom.window.close();
+  }
 });

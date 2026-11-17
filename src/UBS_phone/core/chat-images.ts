@@ -369,6 +369,7 @@ async function generatePromptStep(provider: PortraitImageGen, job: PhoneImageJob
       should_silence: true,
       user_input: built.userInput,
       ordered_prompts: orderedPrompts,
+      max_chat_history: 0,
       custom_api: resolvePhoneApi('image').api,
     }));
     result = typeof r === 'string' ? r : '';
@@ -551,6 +552,7 @@ export async function generatePhoneBatchPrompts(
       should_silence: true,
       user_input: built.userInput,
       ordered_prompts: orderedPrompts,
+      max_chat_history: 0,
       custom_api: args.api ?? resolvePhoneApi('image').api,
     }));
     result = typeof r === 'string' ? r : '';
