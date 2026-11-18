@@ -178,8 +178,8 @@
     "src/unified-statusbar/core/chatu8-bridge.ts": "1128d3eb459cf8f0e936ee28e380e144f267fd7a6593e8e8bc3bdb07bfea9ba7",
     "src/unified-statusbar/core/chronicle-blocks.ts": "2e6d8cc57552b6f9d1c5ddb4cb52b0929c9a4fd02a86983c013bf11e6f3ed906",
     "src/unified-statusbar/core/comfyui-client.ts": "8e4a64208de2a1cf335172fde8bcff5807bcbc7cee098554ca3baec69cc53224",
-    "src/unified-statusbar/core/config-store.ts": "3584b6c91265b38ca6c74a70a4357396b3ce06d0bc2b9dd361fd912bfaf6b108",
-    "src/unified-statusbar/core/constants.ts": "295c1af3b3425127e7d01c9c45cb3616268bf43c02f6edaa51531cd627ef6d21",
+    "src/unified-statusbar/core/config-store.ts": "eaf4fcab141c5a81fe0e11710c2a04e7e7a4882011cd3921ab41d1914c5e714d",
+    "src/unified-statusbar/core/constants.ts": "2b406226c72e7b8be1b3f51231c2301d779e0353fcfcb1c9b7c4171dd848eaf4",
     "src/unified-statusbar/core/context-strip.ts": "c36db119eda68ecde2014b4b8d8b2fa0dca67af8a4cb7458700bd33317ccbcd6",
     "src/unified-statusbar/core/cross-window.ts": "3d7c56f4c425bafaf49ac0ffc8fb46e25745236a8e32ce7d4a48eff3ba17ec7f",
     "src/unified-statusbar/core/currency-icons.ts": "ffca437614048a770df5acc7cd817b1c6bb7378d6f288a1d4eead10dc6c28de6",
@@ -238,7 +238,7 @@
     "src/unified-statusbar/core/type-guards.ts": "7cfd3053f31ab3c460b73fd1cacb134dac0256a6b75c61cf550d4179cffdfe9a",
     "src/unified-statusbar/core/ui-font-scale.ts": "1606ff784c3c20e32a9f04d38c3cec79ec628e62241410b90a043b0d2f7fb8f0",
     "src/unified-statusbar/core/wb-position.ts": "8392633611f45d0bbb677510d7311a9c36af71ed86ce59ce471f0b6361fa1407",
-    "src/unified-statusbar/core/worldbook-entry.ts": "3cb2ab7d629525d2f5aff860f04670bd2b6997862a9be840d66a87434765e18d",
+    "src/unified-statusbar/core/worldbook-entry.ts": "38ab40d02bfd5c771a2c708ec0a48db7f3f5e1f05c523082f033756e937d3a30",
     "src/unified-statusbar/core/worldbook-projection-events.ts": "ec57a7f2866732b2e4515dc9d392b331447b98cad44db8b3650b3fdd0bb064fe"
   }
 }

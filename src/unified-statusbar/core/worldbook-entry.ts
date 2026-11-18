@@ -270,8 +270,8 @@ export async function getEntriesKeysContainedBy(
 //   1) 书源隔离：默认剔除 globalLore（全局外挂书）、chatLore 与 characterLore 中的附加书（additional），
 //      仅放行角色卡主世界书（primary）及用户白名单书；
 //   2) suspend 命中的自投影条目 + 未豁免的 [UBS手机] 条目；
-//   3) 内置正文向兜底：默认剔除 role==='assistant' 条目（防 <场景美化> 伪插话）与沿用 shujuku 的
-//      核心正文向词根（仅作用于用户条目，跳过 UBS-/SeseLedger-/[UBS手机]/TavernDB- 受管族）；
+//   3) 内置正文向兜底：默认剔除 role==='assistant' 条目（防 <场景美化> 伪插话）与内置核心词根
+//      屏蔽正文向规则条目（仅作用于用户条目，跳过 UBS-/SeseLedger-/[UBS手机]/TavernDB- 受管族）；
 //   4) 用户正则黑名单 + 角色卡勾选黑名单；
 //   5) 含 EJS 条目就地渲染（story-oracle renderWiEjs entry 级语义：展宏+evalTemplate{world_info:entry}，失败回原文）。
 // 一次性语义：配置只作用于其后第一次世界书装载，消费即清——并发请求（如填表）互不误伤。
@@ -389,7 +389,7 @@ function entryIdentitySig(entry: any): string {
   return `${name}\u0000${head}`;
 }
 
-/** 判定条目是否命中「后台 AI 内置正文向过滤」（role: assistant + shujuku 核心词根；仅作用于用户条目，不伤受管族）。 */
+/** 判定条目是否命中「后台 AI 内置正文向过滤」（role: assistant + 内置核心词根；仅作用于用户条目，不伤受管族）。 */
 export function isBuiltinMainStoryBlockedEntry(
   entry: any,
   policy: Partial<BackgroundIsolationPolicy> = getBackgroundIsolationPolicy(),

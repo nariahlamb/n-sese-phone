@@ -637,13 +637,13 @@ export const BG_ISOLATION_BLOCK_GLOBAL_LORE_DEFAULT = true;
 export const BG_ISOLATION_BLOCK_ADDITIONAL_LORE_DEFAULT = true;
 /** 默认过滤 role==='assistant' 的世界书条目（防 <场景美化> 等伪对话条目混入后台请求并引发 semi 空回）。 */
 export const BG_ISOLATION_DROP_ASSISTANT_LORE_DEFAULT = true;
-/** 默认启用内置「正文向核心词根」世界书条目过滤（沿用 shujuku 核心词根，仅作用于用户条目）。 */
+/** 默认启用内置「正文向核心词根」世界书条目过滤（仅作用于用户条目，跳过受管族）。 */
 export const BG_ISOLATION_USE_BUILTIN_KEYWORDS_DEFAULT = true;
 /** 默认在出站请求层剥离第三方常驻扩展注入与非我方 assistant 伪插话。 */
 export const BG_ISOLATION_STRIP_FOREIGN_INJECTIONS_DEFAULT = true;
 
-/** 沿用 shujuku-xingv5.2 核心屏蔽词根（仅作用于用户条目，跳过受管族 UBS-/SeseLedger-/[UBS手机]/TavernDB-）：
- *  - 中文词根：子串包含命中（与 shujuku 一致）
+/** 内置正文向核心屏蔽词根（仅作用于用户条目，跳过受管族 UBS-/SeseLedger-/[UBS手机]/TavernDB-）：
+ *  - 中文词根：子串包含命中
  *  - 英文词根：非英文字母边界 + 忽略大小写（兼顾 cot/CoT、MVU/mvu、Status/status、Rule/rule、InitVar/initvar，
  *    同时避免误伤 Cottage / Ruler 等普通英文单词） */
 export const BG_ISOLATION_BUILTIN_ZH_KEYWORDS: readonly string[] = [

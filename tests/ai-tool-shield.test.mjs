@@ -141,7 +141,7 @@ test('phoneFullSlots 不含 chat_history 且含尾部破限；semi 规整后首�
   assert.deepEqual(foreign.messages.map(m => m.role), ['system', 'user']);
 });
 
-test('phoneScanOptions + withNativeScanWorldbook：屏蔽外挂书/assistant/shujuku词根，同时放行 keep 手机记录族', async () => {
+test('phoneScanOptions + withNativeScanWorldbook：屏蔽外挂书/assistant/内置正文向词根，同时放行 keep 手机记录族', async () => {
   const { JSDOM } = await import('jsdom');
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
   const prevWin = globalThis.window;

@@ -322,7 +322,7 @@ export interface StatusBarConfig {
   bgIsolationBlockAdditionalLore: boolean;
   /** 默认过滤 role==='assistant' 的世界书条目（防 <场景美化> 等伪对话条目混入并引发 semi 空回）。默认 true。 */
   bgIsolationDropAssistantLore: boolean;
-  /** 默认启用沿用 shujuku 核心词根的内置正文向世界书条目过滤（仅作用于用户条目，跳过受管族）。默认 true。 */
+  /** 默认启用内置正文向核心词根世界书条目过滤（仅作用于用户条目，跳过受管族）。默认 true。 */
   bgIsolationUseBuiltinKeywords: boolean;
   /** 默认在出站请求层剥离第三方常驻扩展注入与 stray assistant 伪插话。默认 true。 */
   bgIsolationStripForeignInjections: boolean;
