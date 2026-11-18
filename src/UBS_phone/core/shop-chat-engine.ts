@@ -212,18 +212,11 @@ export async function generateShopChatReply(args: ShopChatGenerateArgs): Promise
       content: buildShopChatTriggerText({ roster, style, seller, focusItemName, userText, extraHint: mergedExtra }),
       should_scan: true,
     }], { once: true });
-    await th.injectPrompts([{
-      id: `ubp_shop_chat_dossier_${thread.id}`,
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: buildShopChatDossierText({
-        roster, style, chronicleBlocks, storyText, currencies, commonName,
-        seller, items, focusItemName, focusStatus, transcript, myReviews, buyerReviews, rebateLines, shipTo,
-      }),
-      should_scan: false,
-    }], { once: true });
   };
+  const dossierText = buildShopChatDossierText({
+    roster, style, chronicleBlocks, storyText, currencies, commonName,
+    seller, items, focusItemName, focusStatus, transcript, myReviews, buyerReviews, rebateLines, shipTo,
+  });
 
   const instructionText = buildShopChatInstruction({ roster, style, seller, userText, extraPrompt: mergedExtra, focusItemName });
   const instruction = th.substitudeMacros ? th.substitudeMacros(instructionText) : instructionText;
@@ -236,6 +229,7 @@ export async function generateShopChatReply(args: ShopChatGenerateArgs): Promise
   try {
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,

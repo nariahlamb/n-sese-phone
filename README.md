@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.10`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.11`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -31,6 +31,7 @@
 | **屏内与进度 Toast 半透明紧凑及防误触** | ✅ 代码+单测完成 | `phone-theme.ts` 屏内 `.ubp-toast` 改为半透明玻璃与缩小尺寸；`ai-activity-notify.ts` 新增贴边防误触转关闭与单开/原版 `30×30` 大 `×` 兜底样式（[phone-theme.ts](src/UBS_phone/styles/phone-theme.ts)、[ai-activity-notify.ts](src/UBS_phone/core/ai-activity-notify.ts) `v0.1.0-alpha.5`） |
 | **API 预设出站兼容（source / top_p / 中段 system）** | ✅ 代码+单测完成 | [phone-api.ts](src/UBS_phone/core/phone-api.ts) 的 `presetToApi` 对齐主项目 `api-config.ts`：非 `openai` 的 `source` 透传（`openai` 不显式写）、`top_p` 越界（`<=0` 或 `>1`，如 DeepSeek 拒收的 `0`）归 `'unset'`、并按预设 `promptPostProcessing` 在 `custom_api` 上登记策略（缺失回退 `semi`）；出站层 `ai-tool-shield` 据此把首条对话消息之后的 `system`/`developer` 降级为 `user`（兼容 gpt-load / Gemini / Claude 网关）。新增 `tests/ai-tool-shield.test.mjs`（`0.1.0-alpha.7`） |
 | **后台 AI 请求提示词与外挂世界书清洗** | ✅ 代码+单测完成 | 同步状态栏四道净化共享件（默认仅放行 `primary` 主世界书、屏蔽 `globalLore`/`additional`/`chatLore`、剔除 `role:assistant`、启用内置正文向核心词根过滤并出站剥离第三方扩展注入，同时保持 `[UBS手机]` `keepSpyRecordEntries`/`keepPhoneRecordEntries` 放行族）；[phone-raw.ts](src/UBS_phone/core/phone-raw.ts) `phoneFullSlots()` 移除 `'chat_history'`；[chat-images.ts](src/UBS_phone/core/chat-images.ts) 与 [shop-images.ts](src/UBS_phone/core/shop-images.ts) 补齐 `max_chat_history: 0`；保留楼层标签剥离不变；扩展 `tests/ai-tool-shield.test.mjs`（`0.1.0-alpha.9`–`10`） |
+| **资料块内联直传（修复无 `chat_history` 后社媒求回应及全引擎资料丢失）** | ✅ 代码+单测完成 | [phone-raw.ts](src/UBS_phone/core/phone-raw.ts) 新增 `dossier` 入参并由 `phoneFullSlots(dossier)` 直接内联为 `dialogue_examples` 与 `user_input` 之间的 `system` 槽位，`social/chat/call/spy/browser/night/shop/shop-chat` 8 个引擎全线取消失效的 `injectPrompts(after_system)`（仅保留 `position:'none'` 绿灯触发）；新增 `tests/social-feedback-dossier.test.mjs` 回归覆盖（`0.1.0-alpha.11`） |
 | **真机回归验收** | ⏳ 待继续验证 | 正文联动气泡渲染 + 手机 TT 双开联跑 + 窥私/消息记录世界书长期运行待真机观察 |
 
 ---
@@ -105,7 +106,7 @@
 
 ```powershell
 npm run build   # esbuild 打包 dist/index.js
-npm test        # node --test tests/*.test.mjs（当前 38 通过 / 2 跳过 / 0 失败，共 40）
+npm test        # node --test tests/*.test.mjs（当前 40 通过 / 2 跳过 / 0 失败，共 42）
 npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
 ```
 
@@ -117,6 +118,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-19 | `0.1.0-alpha.11` | 修复移除 `'chat_history'` 槽位后 `injectPrompts({ position: 'after_system' })` 资料块被宿主跳过的故障（导致社媒发帖/点赞后求回应报错「缺少『待反馈的用户互动』『现有评论』资料块」）：[phone-raw.ts](src/UBS_phone/core/phone-raw.ts) 支持将 `dossier` 直接内联为 `ordered_prompts` 中 `dialogue_examples` 与 `user_input` 之间的 `system` 槽位，全线迁移 `social-engine` / `chat-engine` / `call-engine` / `spy-engine` / `browser-engine` / `night-engine` / `shop-engine` / `shop-chat-engine` 8 个引擎（仅保留 `position:'none'` 绿灯触发）；扩展 `tests/ai-tool-shield.test.mjs` 并新增 `tests/social-feedback-dossier.test.mjs` | `build` / `test` 40 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-18 | `0.1.0-alpha.10` | 同步状态栏共享件注释与单测描述，移除无关第三方引用词 | `build` / `test` 38 通过 2 跳过 / `check` 全绿；已推仓 |
 | 2026-11-18 | `0.1.0-alpha.9` | 同步状态栏后台 AI 请求净化与外挂世界书隔离共享件（默认仅放行 `primary` 主世界书、屏蔽 `globalLore`/`additional`/`chatLore`、剔除 `role:assistant`、启用内置正文向核心词根过滤并出站剥离第三方扩展注入，保留 `[UBS手机]` 窥私/消息记录 `keep` 豁免）；`phone-raw.ts` `phoneFullSlots()` 移除 `'chat_history'`；`chat-images.ts` 与 `shop-images.ts` 4 处补齐 `max_chat_history: 0`；扩展 `tests/ai-tool-shield.test.mjs` | `build` / `test` 38 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-17 | `0.1.0-alpha.8` | 同步状态栏 `api-config.ts` 修复：`fetchModelList` 在 `source === 'makersuite'` 时优先直连 `/v1beta/models` 并仅以 `/v1` 回退宿主 `getModelList`，避免裸根地址撞管理页 HTML | `build` / `test` 37 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |

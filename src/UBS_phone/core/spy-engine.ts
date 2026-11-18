@@ -2,7 +2,7 @@
 // ① injectPrompts 绿灯触发：position:'none'（不发给 AI）+ should_scan:true + once:true
 //    → 内容=本轮焦点人物名单 → 绿灯扫描激活主项目角色条目 + [UBS手机]窥私记录/[UBS手机]消息记录 分角色条目
 //    （角色间近期通话/私聊/群聊 + 各角色与主角的近期记录，不进资料块——用户定案）。
-// ② injectPrompts 资料块：position:'after_system'（发给 AI）+ should_scan:false
+// ② 资料块（经 runPhoneRaw 内联进 ordered_prompts，不参与扫描）：
 //    → 焦点人物档案/关系/剧情纪要（每角色保底取含名纪要）/已有群聊清单/焦点群最近 20 条/正文上下文。
 // ③ generateRaw 全槽位 = phone-raw.runPhoneRaw（单一事实源，见 core/phone-raw.ts）：
 //    keep=keepPhoneRecordEntries——窥私请求放行窥私族+消息记录族
@@ -234,38 +234,29 @@ export async function generateSpyContent(args: SpyGenerateArgs = {}): Promise<Sp
     // 额外要求合并产物（进指令 + 追加进触发注入语料——提示里提到的人名同样激活世界书条目）
     const mergedExtra = mergeOneShotHint(settings.extraPrompt, args.extraHint);
 
-    // ②③ 一次性注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
+    // ② 一次性触发注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
     const prepare = async () => {
-    // ② 绿灯触发注入（不进提示词，只参与世界书扫描：焦点人名 + 额外提示文本）
-    await th.injectPrompts([{
-      id: 'ubp_spy_trigger',
-      position: 'none',
-      depth: 0,
-      role: 'system',
-      content: [buildSpyTrigger(focus), mergedExtra.trim()].filter(Boolean).join(' '),
-      should_scan: true,
-    }], { once: true });
-
-    // ③ 资料块注入（发给 AI，不参与扫描；窥私历史走世界书条目不在此段——用户定案）
-    await th.injectPrompts([{
-      id: 'ubp_spy_dossier',
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: buildSpyDossierText({
-        roster,
-        focus,
-        focusGroup,
-        existingGroups,
-        ...(focusConversation ? { focusConversation } : {}),
-        ...(historyConvs.length ? { historyConvs, historyCount: settings.spyHistoryCount } : {}),
-        chronicleBlocks,
-        storyText,
-        style: phoneData.style || '',
-      }),
-      should_scan: false,
-    }], { once: true });
+      await th.injectPrompts([{
+        id: 'ubp_spy_trigger',
+        position: 'none',
+        depth: 0,
+        role: 'system',
+        content: [buildSpyTrigger(focus), mergedExtra.trim()].filter(Boolean).join(' '),
+        should_scan: true,
+      }], { once: true });
     };
+    // ③ 资料块（直传 runPhoneRaw 内联进 ordered_prompts，不参与扫描；窥私历史走世界书条目不在此段）
+    const dossierText = buildSpyDossierText({
+      roster,
+      focus,
+      focusGroup,
+      existingGroups,
+      ...(focusConversation ? { focusConversation } : {}),
+      ...(historyConvs.length ? { historyConvs, historyCount: settings.spyHistoryCount } : {}),
+      chronicleBlocks,
+      storyText,
+      style: phoneData.style || '',
+    });
 
     // ④ 裸生成
     const instructionArgs = {
@@ -285,6 +276,7 @@ export async function generateSpyContent(args: SpyGenerateArgs = {}): Promise<Sp
     // 主角侧互动都靠世界书条目注入——资料块无消息记录段——keepPhoneRecordEntries）
     const raw = await runPhoneRaw({
       scope: 'spy',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepPhoneRecordEntries,

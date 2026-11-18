@@ -7,7 +7,7 @@
 //
 // 三段式（镜像 social-engine）：
 //   ① injectPrompts 绿灯触发 ubp_night_trigger_<mode>  position:'none' + should_scan + once
-//   ② injectPrompts 资料块 ubp_night_dossier_<mode>     position:'after_system'
+//   ② 资料块（经 runPhoneRaw 内联进 ordered_prompts）
 //   ③ generateRaw（runPhoneRaw，scope:'night'）+ max_chat_history:0 + generation_id 可中断
 //
 // 落盘：只写 PhoneChatData.night（滚动窗口 + 各域合并），绝不触碰 worldbook/时间线/其它 App。
@@ -286,26 +286,18 @@ async function generateNightRaw(args: NightRawArgs): Promise<string> {
   if (!th?.generateRaw || !th?.injectPrompts) {
     throw new PhoneChatError('env', '无法访问酒馆助手 API（generateRaw/injectPrompts），请检查酒馆助手版本');
   }
-  // ①② 一次性注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
+  // ① 一次性触发注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
   const prepare = async () => {
-  if (args.triggerText.trim()) {
-    await th.injectPrompts([{
-      id: `ubp_night_trigger_${args.mode}`,
-      position: 'none',
-      depth: 0,
-      role: 'system',
-      content: args.triggerText,
-      should_scan: true,
-    }], { once: true });
-  }
-  await th.injectPrompts([{
-    id: `ubp_night_dossier_${args.mode}`,
-    position: 'after_system',
-    depth: 0,
-    role: 'system',
-    content: args.dossierText,
-    should_scan: false,
-  }], { once: true });
+    if (args.triggerText.trim()) {
+      await th.injectPrompts([{
+        id: `ubp_night_trigger_${args.mode}`,
+        position: 'none',
+        depth: 0,
+        role: 'system',
+        content: args.triggerText,
+        should_scan: true,
+      }], { once: true });
+    }
   };
   const instruction = th.substitudeMacros ? th.substitudeMacros(args.instruction) : args.instruction;
   const generationId = makeGenerationId('ubp-night');
@@ -314,6 +306,7 @@ async function generateNightRaw(args: NightRawArgs): Promise<string> {
     // keep 恒 false：不夜城是只读单向域——[UBS手机] 前缀条目一律不进本次扫描（"入"只有资料块里的显式内容）
     return await runPhoneRaw({
       scope: 'night',
+      dossier: args.dossierText,
       instruction,
       generationId,
       keep: () => false,

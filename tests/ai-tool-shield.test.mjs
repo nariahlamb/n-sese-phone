@@ -198,3 +198,28 @@ test('phoneScanOptions + withNativeScanWorldbook：屏蔽外挂书/assistant/内
     dom.window.close();
   }
 });
+
+test('phoneFullSlots(dossier)：资料块直接作为 system 槽位内联于 dialogue_examples 与 user_input 之间，且经 semi 规整完整保留', () => {
+  const dossier = '■ 待反馈的用户互动\n◇ 微博博文 p_wb_1（白鸟）：今天天气不错\n　主角动作：点赞了';
+  const slots = phoneFullSlots(dossier);
+  assert.equal(slots.includes('chat_history'), false, '仍不得包含 chat_history');
+  const deIdx = slots.indexOf('dialogue_examples');
+  const uiIdx = slots.indexOf('user_input');
+  assert.ok(deIdx >= 0 && uiIdx > deIdx + 1, 'dossier 槽位须位于 dialogue_examples 与 user_input 之间');
+  const dossierSlot = slots[deIdx + 1];
+  assert.equal(typeof dossierSlot, 'object');
+  assert.equal(dossierSlot.role, 'system');
+  assert.equal(dossierSlot.content, dossier);
+
+  const messages = slots.map(entry => (
+    typeof entry === 'string'
+      ? { role: entry === 'user_input' ? 'user' : 'system', content: '§' + entry }
+      : { role: entry.role, content: entry.content }
+  ));
+  const fp = buildRequestFingerprint({ ordered_prompts: [{ content: messages[0].content + '…' }] });
+  const data = { model: 'gemini-2.5-pro', messages, custom_prompt_post_processing: '' };
+  const result = scrubGenerateData(data, fp, 'semi');
+  assert.equal(result.touched, true);
+  const combined = data.messages.map(m => m.content).join('\n');
+  assert.ok(combined.includes(dossier), '经 semi 规整后资料块内容必须完整保留');
+});

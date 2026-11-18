@@ -1,7 +1,7 @@
 // ===== 网上商城 · 引擎（docs/52 §4/§6/§7）=====
 // 三段式刷新（镜像 browser-engine）：
 //   ① 绿灯触发注入 ubp_shop_trigger（position:'none' + should_scan）——点了刷新才注入（零常驻）
-//   ② 资料块 ubp_shop_dossier（after_system）——时间地点 + **货币体系（名/描述/精度；不注入余额）** +
+//   ② 资料块（经 runPhoneRaw 内联进 ordered_prompts）——时间地点 + **货币体系（名/描述/精度；不注入余额）** +
 //      剧情纪要（最新 N 条，不筛主角名）+ 主角档案 + 最近正文 + 现有货架名（防重名）+ 现有类别
 //   ③ runPhoneRaw（全槽位 + max_chat_history 0 + generation_id 可中止）
 // 购买/取消/送达结算也收在本模块（编排：扣款 → 建单 → 写备忘 → 通知；幂等与闸门在各自函数内）。
@@ -145,18 +145,11 @@ export async function refreshShopCatalog(args: {
       content: buildShopTriggerText({ roster, style, extraHint: mergedExtra }),
       should_scan: true,
     }], { once: true });
-    await th.injectPrompts([{
-      id: 'ubp_shop_dossier',
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: buildShopDossierText({
-        roster, style, chronicleBlocks, storyText, currencies, commonName,
-        existingNames: existing, existingCategories: existingCats,
-      }),
-      should_scan: false,
-    }], { once: true });
   };
+  const dossierText = buildShopDossierText({
+    roster, style, chronicleBlocks, storyText, currencies, commonName,
+    existingNames: existing, existingCategories: existingCats,
+  });
 
   const instructionText = buildShopInstruction({
     roster,
@@ -171,6 +164,7 @@ export async function refreshShopCatalog(args: {
   try {
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,

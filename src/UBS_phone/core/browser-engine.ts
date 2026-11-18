@@ -1,7 +1,7 @@
 // ===== 幻想浏览器 · 引擎（第八轮 §5 · N8）=====
 // 三段式管线（镜像 call-engine/social-engine 的收编件）：
 //   ① 绿灯触发注入 ubp_browser_trigger（position:'none' + should_scan）——点了搜索才注入（零常驻）
-//   ② 资料块 ubp_browser_dossier（after_system）——主角档案 + 在场状态 + 最近正文 + 手机既有记录
+//   ② 资料块（经 runPhoneRaw 内联进 ordered_prompts）——主角档案 + 在场状态 + 最近正文 + 手机既有记录
 //   ③ runPhoneRaw（全槽位 + max_chat_history 0 + generation_id 可中止）
 // 解析失败抛可读错误（不静默）；落库与盖戳由调用方（app-browser）处理。
 
@@ -83,17 +83,10 @@ export async function generateBrowserSearch(args: {
       content: [buildBrowserTriggerText({ query: args.query, roster, style }), mergedExtra.trim()].filter(Boolean).join(' '),
       should_scan: true,
     }], { once: true });
-    await th.injectPrompts([{
-      id: 'ubp_browser_dossier',
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: buildBrowserDossierText({
-        roster, query: args.query, chronicleBlocks, storyText, mixedRecords, style,
-      }),
-      should_scan: false,
-    }], { once: true });
   };
+  const dossierText = buildBrowserDossierText({
+    roster, query: args.query, chronicleBlocks, storyText, mixedRecords, style,
+  });
 
   const instructionText = buildBrowserInstruction({ roster, query: args.query, extraPrompt: mergedExtra, style });
   const instruction = th.substitudeMacros ? th.substitudeMacros(instructionText) : instructionText;
@@ -103,6 +96,7 @@ export async function generateBrowserSearch(args: {
   try {
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,

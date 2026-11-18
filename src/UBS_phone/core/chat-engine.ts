@@ -10,8 +10,7 @@
 //      （提到谁，谁的世界书仍被扫描激活）。气氛组独立焦点：≤5 全员、>5 随机 3～5；
 //      被@/被回复必进，@所有人=全部已生成气氛组；未进焦点不进成员名段。
 //
-// ② injectPrompts 资料块
-//    位置 position:'after_system'（发给 AI）｜扫描 should_scan:false｜once:true
+// ② 资料块（经 runPhoneRaw 内联进 ordered_prompts，位于 dialogue_examples 与 user_input 之间）
 //    → 内容由功能决定；发给 AI 但不参与绿灯扫描。
 //    → 正文（AI 回复）上下文不走 chat_history 槽位，而是经主项目"上下文标签剥离"
 //      （stripWithContextConfig）处理后通过本段注入；具体带几层等由功能决定。
@@ -267,10 +266,8 @@ export async function generateConversationReply(args: GenerateReplyArgs): Promis
   // 额外要求合并产物（进指令 + 追加进触发注入语料——提示里提到的人名同样激活世界书条目）
   const mergedExtra = mergeOneShotHint(settings.extraPrompt, args.extraHint);
 
-  // ②③ 一次性注入（绿灯触发 + 资料块）：once:true 只在下一次请求生成中有效，故不能只做一次——
-  // 交给 runPhoneRaw 的 prepare 在【每次尝试】前重跑，自动重试那一发才不会丢掉资料块。
+  // ② 一次性触发注入：once:true 只在下一次请求生成中有效，交给 runPhoneRaw 的 prepare 在每次尝试前重跑。
   const prepare = async () => {
-    // ② 绿灯触发注入（不进提示词，只参与世界书扫描；成员名段=注入名单，用户输入/聊天记录段全量+额外提示）
     await th.injectPrompts([{
       id: `ubp_phone_trigger_${conversation.id}`,
       position: 'none',
@@ -284,29 +281,21 @@ export async function generateConversationReply(args: GenerateReplyArgs): Promis
       }), mergedExtra.trim()].filter(Boolean).join(' '),
       should_scan: true,
     }], { once: true });
-
-    // ③ 资料块注入（发给 AI，不参与扫描；档案/关系段按注入名单收窄）
-    // 桌游关键词联动（docs/16 §2.8）：用户输入含「狼人杀/谁是卧底」→ 注入与聊天相关角色有关的最近 3 场总结
-    const gameSection = buildGameSummariesSection(userText, relatedNames, phoneData.games || null);
-    await th.injectPrompts([{
-      id: `ubp_phone_dossier_${conversation.id}`,
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: [buildDossierText({
-        roster,
-        conversation,
-        injectedMembers,
-        chronicleBlocks,
-        storyText,
-        mixedRecords,
-        ...(groupRecent ? { groupRecent } : {}),
-        focusAtmosphereNames: focusAtmoNames,
-        style: phoneData.style || '',
-      }), gameSection].filter(Boolean).join('\n\n'),
-      should_scan: false,
-    }], { once: true });
   };
+
+  // ③ 资料块正文（直传 runPhoneRaw 内联进 ordered_prompts；桌游关键词联动见 docs/16 §2.8）
+  const gameSection = buildGameSummariesSection(userText, relatedNames, phoneData.games || null);
+  const dossierText = [buildDossierText({
+    roster,
+    conversation,
+    injectedMembers,
+    chronicleBlocks,
+    storyText,
+    mixedRecords,
+    ...(groupRecent ? { groupRecent } : {}),
+    focusAtmosphereNames: focusAtmoNames,
+    style: phoneData.style || '',
+  }), gameSection].filter(Boolean).join('\n\n');
 
   // ④ 裸生成（指令按分支：私聊/群聊/好友申请）
   const instructionArgs: InstructionArgs = {
@@ -338,6 +327,7 @@ export async function generateConversationReply(args: GenerateReplyArgs): Promis
     // 角色间历史供对方言行连贯、公共话题人人可知；消息记录族照旧剔除——资料块已自带）
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,

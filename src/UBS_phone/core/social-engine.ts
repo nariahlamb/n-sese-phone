@@ -6,8 +6,7 @@
 //    + 最新 1 层正文（处理后的）；
 //    有待反馈互动时追加贴主名+主贴文本+现有评论+用户动作内容
 //    （保证回应条目被激活，其余注入触发不了绿灯是纯噪音）。求回应请求=随机 N 人+互动内容。
-// ② injectPrompts 资料块 ubp_social_dossier_<id>
-//    position:'after_system'（发给 AI）｜should_scan:false｜once:true
+// ② 资料块（经 runPhoneRaw 内联进 ordered_prompts，位于 dialogue_examples 与 user_input 之间，不参与扫描）
 //    内容=时间地点+纪要+发帖人档案（≤12人截断）+人物关系+最近正文+已有内容摘要（防重复）
 //    +待反馈互动段（帖子全文+全部现有评论+主角动作——保证回应针对性）。
 // ③ generateRaw 标准模板（全槽位 + max_chat_history 硬编码 0 + generation_id 可中止）。
@@ -526,7 +525,6 @@ export async function runAuthorProfileGeneration(scope: 'weibo' | 'xhs', name: s
     const excerpt = ownPosts.slice(0, 5).map(p => `· ${socialExcerpt(scope === 'weibo' ? (p as WeiboPost).text : (p as XhsNote).title, 40)}`).join('\n');
     const raw = await generateSocialRaw({
       triggerId: `ubp_social_trigger_author_${scope}`,
-      dossierId: `ubp_social_dossier_author_${scope}`,
       triggerText: name,
       dossierText: buildAuthorProfileDossier({ roster, chronicleBlocks, ...(excerpt ? { excerpt } : {}) }),
       instruction: buildAuthorProfileInstruction({ roster, scope, name, style: readPhoneData().style || '' }),
@@ -872,7 +870,6 @@ function buildFeedbackMixedRecords(
 
 async function generateSocialRaw(args: {
   triggerId: string;
-  dossierId: string;
   triggerText: string;
   dossierText: string;
   instruction: string;
@@ -884,31 +881,21 @@ async function generateSocialRaw(args: {
   if (!th?.generateRaw || !th?.injectPrompts) {
     throw new PhoneChatError('env', '无法访问酒馆助手 API（generateRaw/injectPrompts），请检查酒馆助手版本');
   }
-  // ①② 一次性注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
+  // ① 一次性触发注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
   const prepare = async () => {
-  // ① 绿灯触发注入（不进提示词，只参与世界书扫描；空文本跳过）
-  if (args.triggerText.trim()) {
-    await th.injectPrompts([{
-      id: args.triggerId,
-      position: 'none',
-      depth: 0,
-      role: 'system',
-      content: args.triggerText,
-      should_scan: true,
-    }], { once: true });
-  }
-  // ② 资料块注入（发给 AI，不参与扫描）
-  await th.injectPrompts([{
-    id: args.dossierId,
-    position: 'after_system',
-    depth: 0,
-    role: 'system',
-    content: args.dossierText,
-    should_scan: false,
-  }], { once: true });
+    if (args.triggerText.trim()) {
+      await th.injectPrompts([{
+        id: args.triggerId,
+        position: 'none',
+        depth: 0,
+        role: 'system',
+        content: args.triggerText,
+        should_scan: true,
+      }], { once: true });
+    }
   };
 
-  // ③ 裸生成（指令模板先做宏替换）
+  // ③ 裸生成（指令模板先做宏替换；② 资料块直传 runPhoneRaw 内联进 ordered_prompts）
   const instruction = th.substitudeMacros ? th.substitudeMacros(args.instruction) : args.instruction;
   const generationId = makeGenerationId('ubp-social');
   _activeGenerations.add(generationId);
@@ -917,6 +904,7 @@ async function generateSocialRaw(args: {
     // 发帖角色的角色间历史供其言行连贯、公共话题人人可知；消息记录族照旧剔除——资料块已自带）
     return await runPhoneRaw({
       scope: 'social',
+      dossier: args.dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,
@@ -1091,7 +1079,6 @@ async function runRefresh(kind: SocialKind, rosterOverride?: RosterSnapshot, foc
 
   const raw = await generateSocialRaw({
     triggerId: `ubp_social_trigger_${kind}`,
-    dossierId: `ubp_social_dossier_${kind}`,
     triggerText,
     dossierText: buildSocialDossierText(dossierArgs),
     instruction,
@@ -1200,7 +1187,6 @@ export async function requestSocialFeedback(args: { extraHint?: string; focusNam
     const mixed = buildFeedbackMixedRecords(contexts, phoneData, social, authors, roster.protagonistName, settings.phoneHistoryCount);
     const raw = await generateSocialRaw({
       triggerId: 'ubp_social_trigger_feedback',
-      dossierId: 'ubp_social_dossier_feedback',
       triggerText: [
         (args.focusNames && args.focusNames.length
           ? mergeFocusPicks(args.focusNames, authors, Math.max(triggerContactsOf('feedback'), args.focusNames.length))

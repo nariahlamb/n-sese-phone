@@ -5,7 +5,8 @@
 //     → char_description → char_personality → scenario → world_info_after
 //     → dialogue_examples → user_input → jailbreakTail
 //   已移除 'chat_history'：max_chat_history 恒 0，保留 'chat_history' 仍会触发酒馆/TT 塞入
-//   at_depth 世界书条目（如 <场景美化>）；历史与消息资料一律走 after_system 资料块。
+//   at_depth 世界书条目（如 <场景美化>）；资料块（dossier）不再走 injectPrompts(after_system)
+//   （无 chat_history 槽位时兼容层会跳过 in_chat/after_system 注入），而是直接作为 system 槽位内联进 ordered_prompts。
 //   user_input = 本功能指令，走 'user_input' 槽位，内容由功能决定，不参与绿灯扫描。
 //   绿灯扫描文本 = 真实酒馆聊天（按全局 scan_depth）+ 触发注入；user_input/资料块不参与。
 //
@@ -35,11 +36,14 @@ import type { PhoneApiScopeKey } from './phone-settings';
  * ★ 必须是函数而非模块级常量：破限头/尾部破限需按请求实时求值
  *   （破限与反八股配置可被用户随时改；且模块求值时机早于宿主配置就绪，冻结会拿到空破限）。
  */
-export function phoneFullSlots() {
+export function phoneFullSlots(dossier?: string) {
+  const dossierText = typeof dossier === 'string' ? dossier.trim() : '';
   return [
     ...getJailbreakHeadPrompts({ antiCliche: true }),
     'world_info_before', 'persona_description', 'char_description', 'char_personality',
-    'scenario', 'world_info_after', 'dialogue_examples', 'user_input',
+    'scenario', 'world_info_after', 'dialogue_examples',
+    ...(dossierText ? [{ role: 'system' as const, content: dossierText }] : []),
+    'user_input',
     ...getJailbreakTailPrompts(),
   ] as const;
 }
@@ -57,6 +61,8 @@ export function phoneScanOptions(keep: (name: string) => boolean): NativeScanPre
 export interface PhoneRawArgs {
   /** 请求 API 预设 scope（通话与聊天同用 'chat'，与原实现一致）。 */
   scope: PhoneApiScopeKey;
+  /** 资料块正文（直接作为 system 槽位内联到 dialogue_examples 与 user_input 之间，避免无 chat_history 时被宿主跳过）。 */
+  dossier?: string;
   /** 已做宏替换的指令文本（走 user_input 槽位）。 */
   instruction: string;
   /** 可中止的 generation id（记账在调用侧）。 */
@@ -126,7 +132,7 @@ export async function runPhoneRaw(args: PhoneRawArgs): Promise<string> {
         () => th.generateRaw({
           should_silence: true,
           user_input: args.instruction,
-          ordered_prompts: phoneFullSlots(),
+          ordered_prompts: phoneFullSlots(args.dossier),
           max_chat_history: 0,
           custom_api: resolvePhoneApi(args.scope).api,
           generation_id: args.generationId,

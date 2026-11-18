@@ -1,6 +1,6 @@
 // ===== 通话 AI 引擎：三段式管线（镜像 chat-engine，差异见 docs/05 §4.0 对照表） =====
 // ①绿灯触发（position:'none' + should_scan:true）内容=被叫角色名+最近手机记录混合块+本次通话全内容（纪要走资料块，不再注入 AM 序号）
-// ②资料块（after_system + should_scan:false）与微信同构，「最近手机记录」段（已排除本次通话）+末段「本次通话内容」
+// ②资料块（经 runPhoneRaw 内联进 ordered_prompts，不参与扫描）与微信同构，「最近手机记录」段（已排除本次通话）+末段「本次通话内容」
 // ③generateRaw 全槽位 + max_chat_history:0 + custom_api + generation_id 可中止
 // 富媒体块不带（通话无图片/转账/红包）。不写微信会话/主项目楼层。
 
@@ -98,28 +98,18 @@ async function callTurn(args: CallTurnArgs): Promise<CallEngineResult> {
   // 额外要求合并产物（进指令 + 追加进触发注入语料——提示里提到的人名同样激活世界书条目）
   const mergedExtra = mergeOneShotHint(settings.extraPrompt, args.extraHint);
 
-  // ①② 一次性注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
+  // ① 一次性触发注入：once:true 只在下一次请求生成中有效 → 交给 runPhoneRaw 的 prepare 每次尝试前重跑
   const prepare = async () => {
-  // ① 绿灯触发注入（不进提示词，只参与世界书扫描；内容=被叫角色名+混合记录+本次通话内容+额外提示）
-  await th.injectPrompts([{
-    id: `ubp_call_trigger_${args.peerName}`,
-    position: 'none',
-    depth: 0,
-    role: 'system',
-    content: [buildCallTriggerText({ peerName: args.peerName, mixedRecords, callLines: args.callLines }), mergedExtra.trim()].filter(Boolean).join(' '),
-    should_scan: true,
-  }], { once: true });
-
-  // ② 资料块注入（发给 AI，不参与扫描；与微信同构，混合记录段+末段=本次通话内容）
-  await th.injectPrompts([{
-    id: `ubp_call_dossier_${args.peerName}`,
-    position: 'after_system',
-    depth: 0,
-    role: 'system',
-    content: buildCallDossierText({ roster, peerName: args.peerName, chronicleBlocks, storyText, mixedRecords, callLines: args.callLines, style: phoneData.style || '' }),
-    should_scan: false,
-  }], { once: true });
+    await th.injectPrompts([{
+      id: `ubp_call_trigger_${args.peerName}`,
+      position: 'none',
+      depth: 0,
+      role: 'system',
+      content: [buildCallTriggerText({ peerName: args.peerName, mixedRecords, callLines: args.callLines }), mergedExtra.trim()].filter(Boolean).join(' '),
+      should_scan: true,
+    }], { once: true });
   };
+  const dossierText = buildCallDossierText({ roster, peerName: args.peerName, chronicleBlocks, storyText, mixedRecords, callLines: args.callLines, style: phoneData.style || '' });
 
   // ③ 裸生成（指令按轮次：发起=接听判定+首轮内容（回拨带衔接规则）；续话=回应我方）
   // 情绪/演绎标注只在 TTS 开启（且情绪演绎开关开着）时教学——关闭时整条规则不发、编号重排
@@ -142,6 +132,7 @@ async function callTurn(args: CallTurnArgs): Promise<CallEngineResult> {
     // 被叫角色的角色间历史供其言行连贯、公共话题人人可知；消息记录族照旧剔除——资料块已自带）
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,
@@ -245,18 +236,11 @@ export async function generateVoicemail(args: {
       content: [buildCallTriggerText({ peerName: args.peerName, mixedRecords, callLines: [] }), mergedExtra.trim()].filter(Boolean).join(' '),
       should_scan: true,
     }], { once: true });
-    await th.injectPrompts([{
-      id: `ubp_vm_dossier_${args.peerName}`,
-      position: 'after_system',
-      depth: 0,
-      role: 'system',
-      content: buildCallDossierText({
-        roster, peerName: args.peerName, chronicleBlocks, storyText, mixedRecords,
-        callLines: [], tailNote: voicemailTailNote(args.scene), style: phoneData.style || '',
-      }),
-      should_scan: false,
-    }], { once: true });
   };
+  const dossierText = buildCallDossierText({
+    roster, peerName: args.peerName, chronicleBlocks, storyText, mixedRecords,
+    callLines: [], tailNote: voicemailTailNote(args.scene), style: phoneData.style || '',
+  });
 
   const voiceEmotion = settings.voiceEnabled === true && settings.voiceEmotion === true;
   const instructionText = buildVoicemailInstruction({
@@ -271,6 +255,7 @@ export async function generateVoicemail(args: {
   try {
     raw = await runPhoneRaw({
       scope: 'chat',
+      dossier: dossierText,
       instruction,
       generationId,
       keep: keepSpyAndPublicEntries,
