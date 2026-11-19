@@ -1,7 +1,7 @@
 // ===== 商城消息（商家沟通）· 提示词（docs/54 §3）=====
 // 三段式（镜像微信私聊，资料块换血）：
 //   ① 触发注入（position:'none' + should_scan）——点了生成条才注入（零常驻）
-//   ② 资料块（after_system）——时间地点 + 货币体系 + 主角档案 + 纪要 + 正文 + **收货信息** +
+//   ② 资料块（内联进 ordered_prompts）——时间地点 + 货币体系 + 主角档案 + 纪要 + 正文 + **收货信息** +
 //      **本店（在售清单带商品当前状态）** + **买家评价** + **红包与返现记录** + **本会话沟通记录（最近 30 条）**
 //   ③ 指令（user_input + runPhoneRaw 全槽位）——四类富媒体（图片/红包/改价/新商品）+ 谈价/售后/状态纪律
 //
@@ -170,7 +170,7 @@ export function formatShopTranscript(messages: readonly ShopMessage[], limit: nu
   return lines;
 }
 
-/** ② 资料块（after_system，发给 AI）。 */
+/** ② 资料块（经 phoneFullSlots 内联进 ordered_prompts，发给 AI）。 */
 export function buildShopChatDossierText(args: ShopChatDossierArgs): string {
   const style = (args.style || '') as PhoneStyle;
   const spec = shopSpec(args.style || '');

@@ -115,7 +115,7 @@ export function relationSection(roster: RosterSnapshot, names: string[]): string
   ].join('\n');
 }
 
-/** 资料块（after_system + should_scan:false 注入）。 */
+/** 资料块（经 phoneFullSlots 内联进 ordered_prompts，不参与扫描）。 */
 export function buildDossierText(args: DossierArgs): string {
   const style = args.style || '';
   const sections: string[] = [s(style,

@@ -475,7 +475,7 @@ function socialDigest(lines: string[]): string {
   return lines.slice(0, SOCIAL_DIGEST_LIMIT).join('\n');
 }
 
-/** 资料块（after_system + should_scan:false 注入）。 */
+/** 资料块（经 phoneFullSlots 内联进 ordered_prompts，不参与扫描）。 */
 export function buildSocialDossierText(args: SocialDossierArgs): string {
   const sections: string[] = ['【社媒资料参考（供保持人物与世界一致，非剧中人所知）】'];
   const g = args.roster.global;
@@ -840,7 +840,7 @@ ${AUTHOR_CLOSE_TAG}
 4. 严禁输出 ${me}（{{user}}）或任何用户身份的资料；只输出 JSON，不要解释。`;
 }
 
-/** 作者资料资料块（after_system）：时间地点 + 含名纪要 + （路人）已有帖摘要。 */
+/** 作者资料资料块（经 phoneFullSlots 内联进 ordered_prompts）：时间地点 + 含名纪要 + （路人）已有帖摘要。 */
 export function buildAuthorProfileDossier(args: { roster: RosterSnapshot; chronicleBlocks: string; excerpt?: string }): string {
   const g = args.roster.global;
   const sections: string[] = ['【社媒资料参考（供保持人物与世界一致，非剧中人所知）】'];

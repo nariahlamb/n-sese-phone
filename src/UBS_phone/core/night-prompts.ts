@@ -253,7 +253,7 @@ export function buildNightBoardSection(boardIds: readonly string[], promptOverri
   return lines.length ? `■ 本次板块设定（只用于写作，界面按氛围化名字展示）\n${lines.join('\n')}` : '';
 }
 
-/** 资料块（after_system + should_scan:false 注入）。 */
+/** 资料块（经 phoneFullSlots 内联进 ordered_prompts，不参与扫描）。 */
 export function buildNightDossierText(args: NightDossierArgs): string {
   const sections: string[] = ['【不夜城资料参考（供保持人物与世界一致，非剧中人所知）】'];
   const g = args.roster.global;

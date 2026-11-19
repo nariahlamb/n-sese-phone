@@ -3,7 +3,7 @@
 //   空态与生成中文案 / 无货币占位币种名 / 世界观调性 / 物流语境——**渲染层与提示词共用一份**。
 // 三段式管线（镜像 browser-engine）：
 //   ① 绿灯触发（position:'none' + should_scan）——点了刷新才注入（按钮触发型，零常驻）
-//   ② 资料块（after_system）——时间地点 + **货币体系（名/描述/精度；用户定案不注入余额）** +
+//   ② 资料块（内联进 ordered_prompts）——时间地点 + **货币体系（名/描述/精度；用户定案不注入余额）** +
 //      剧情纪要（最新 N 条，不筛主角名）+ 主角档案 + 最近正文进展 + 现有货架名（防重名）+ 现有类别
 //   ③ generateRaw 全槽位 + max_chat_history 0（runPhoneRaw）
 //
@@ -185,7 +185,7 @@ export interface ShopDossierArgs {
   existingCategories?: readonly string[];
 }
 
-/** ② 资料块（after_system，发给 AI）。 */
+/** ② 资料块（经 phoneFullSlots 内联进 ordered_prompts，发给 AI）。 */
 export function buildShopDossierText(args: ShopDossierArgs): string {
   const style = (args.style || '') as PhoneStyle;
   const spec = shopSpec(args.style || '');

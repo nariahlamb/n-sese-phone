@@ -25,7 +25,7 @@ export function buildSpyTrigger(focus: readonly string[]): string {
   return focus.filter(Boolean).join(' ');
 }
 
-// ─── ② 资料块（after_system + should_scan:false） ───
+// ─── ② 资料块（经 phoneFullSlots 内联进 ordered_prompts，不参与扫描） ───
 
 export interface SpyDossierArgs {
   roster: RosterSnapshot;

@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.11`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.12`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -118,6 +118,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-19 | `0.1.0-alpha.12` | 清理 `*-prompts.ts` 8 处遗留 `after_system` 注释与 `phoneFullSlots` 内联口径对齐 | `build` / `test` 40 通过 2 跳过 / `check` 全绿；待真机验收 |
 | 2026-11-19 | `0.1.0-alpha.11` | 修复移除 `'chat_history'` 槽位后 `injectPrompts({ position: 'after_system' })` 资料块被宿主跳过的故障（导致社媒发帖/点赞后求回应报错「缺少『待反馈的用户互动』『现有评论』资料块」）：[phone-raw.ts](src/UBS_phone/core/phone-raw.ts) 支持将 `dossier` 直接内联为 `ordered_prompts` 中 `dialogue_examples` 与 `user_input` 之间的 `system` 槽位，全线迁移 `social-engine` / `chat-engine` / `call-engine` / `spy-engine` / `browser-engine` / `night-engine` / `shop-engine` / `shop-chat-engine` 8 个引擎（仅保留 `position:'none'` 绿灯触发）；扩展 `tests/ai-tool-shield.test.mjs` 并新增 `tests/social-feedback-dossier.test.mjs` | `build` / `test` 40 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-18 | `0.1.0-alpha.10` | 同步状态栏共享件注释与单测描述，移除无关第三方引用词 | `build` / `test` 38 通过 2 跳过 / `check` 全绿；已推仓 |
 | 2026-11-18 | `0.1.0-alpha.9` | 同步状态栏后台 AI 请求净化与外挂世界书隔离共享件（默认仅放行 `primary` 主世界书、屏蔽 `globalLore`/`additional`/`chatLore`、剔除 `role:assistant`、启用内置正文向核心词根过滤并出站剥离第三方扩展注入，保留 `[UBS手机]` 窥私/消息记录 `keep` 豁免）；`phone-raw.ts` `phoneFullSlots()` 移除 `'chat_history'`；`chat-images.ts` 与 `shop-images.ts` 4 处补齐 `max_chat_history: 0`；扩展 `tests/ai-tool-shield.test.mjs` | `build` / `test` 38 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |

@@ -3,7 +3,7 @@
 //   内容调性 / **视觉语言** / **视觉母题库** / **可用交互**——提示词与 UI 文案共用一份。
 // 三段式管线（镜像 call/social）：
 //   ① 绿灯触发（position:'none' + should_scan）——用户在浏览器里点了搜索才注入（按钮触发型，零常驻）
-//   ② 资料块（after_system）——角色档案 + 在场状态 + 最近正文 + 手机既有记录（反全知：只喂已发生/已说过）
+//   ② 资料块（内联进 ordered_prompts）——角色档案 + 在场状态 + 最近正文 + 手机既有记录（反全知：只喂已发生/已说过）
 //   ③ generateRaw 全槽位 + max_chat_history 0（runPhoneRaw）
 //
 // 第十轮口径变更（用户定案：「生成怎样的界面完全交给 AI 决定，CSS 元素/结构/样式/色调天马行空」）：
@@ -225,7 +225,7 @@ export interface BrowserDossierArgs {
   style?: string;
 }
 
-/** ② 资料块（after_system，发给 AI）。 */
+/** ② 资料块（经 phoneFullSlots 内联进 ordered_prompts，发给 AI）。 */
 export function buildBrowserDossierText(args: BrowserDossierArgs): string {
   const style = (args.style || '') as PhoneStyle;
   const spec = browserSpec(args.style || '');

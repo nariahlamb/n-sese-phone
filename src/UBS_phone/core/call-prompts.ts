@@ -1,6 +1,6 @@
 // ===== 通话提示词模板与上下文拼装（契约由 tests/phone-call-prompts.test.cjs 锁定） =====
 // 输出契约 <ubp_call>（发起版带 status/reason；续话版仅 thought/content）见 docs/05 §4.3。
-// 三段式骨架与微信完全一致（docs/05 §4.0 对照表）：①绿灯触发（扫描）②资料块（after_system）
+// 三段式骨架与微信完全一致（docs/05 §4.0 对照表）：①绿灯触发（扫描）②资料块（内联进 ordered_prompts）
 // ③generateRaw 指令。资料块的档案/关系段直接复用 chat-prompts 的段落函数（单一事实源）。
 
 import { contactSection, relationSection } from './chat-prompts';
@@ -83,7 +83,7 @@ function numberedRules(rules: readonly string[]): string {
 }
 
 /**
- * 资料块（after_system + should_scan:false）。结构镜像微信 buildDossierText，
+ * 资料块（经 phoneFullSlots 内联进 ordered_prompts，不参与扫描）。结构镜像微信 buildDossierText，
  * 差异=「最近手机记录」段（与对方相关的混合记录，已排除本次通话）+末段「本次通话内容」。
  */
 export function buildCallDossierText(args: CallDossierArgs): string {
