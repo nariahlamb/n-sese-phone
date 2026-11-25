@@ -1,8 +1,13 @@
 # 瑟瑟小手机（`n-sese-phone`）
 
 > **致后续接手本仓库的 AI（强制维护纪律）**
-> 1. **每次修改本仓库代码、正文联动标签协议、世界书投影或对外桥接接口后，必须同步更新本 README**（至少更新「当前改造状态与未完成项」「契约速查」及文末「改造记录」），严禁只改代码不留记录。
-> 2. **先读再改，改完自动推仓（长期明确授权）**：涉及 `src/` 修改必须同步刷新 `source-files.sha256.json`，重建 `dist/index.js`，并运行 `npm test` 与 `npm run check`；全绿后同步递增版本号并**直接 `git commit` 与 `git push origin main`**（无需逐次询问，也不要打包 zip，详见 [AGENTS.md](AGENTS.md)）。
+> 1. **每次修改本仓库代码、正文联动标签协议、世界书投影或对外桥接接口后，必须同步更新本 README**（至少更新第 2 节状态表、第 5 节测试数与第 6 节改造记录），严禁只改代码不留记录。
+> 2. **先读再改，按序交付（长期明确授权）**：
+>    1. 改代码 / 文档；
+>    2. 改到 `src/` 时刷新 `source-files.sha256.json` 对应条目并重建 `dist/index.js`；
+>    3. **仅功能 / 界面 / 修复类改动**才递增 4 处版本号（`manifest.json`、`package.json`、`package-lock.json` 顶层与 `packages[""]`）并更新本 README，**纯文档同步不递增版本号**；
+>    4. 最终 `npm run build`、`npm test`、`npm run check` 全绿（CI 另跑 `git diff --exit-code -- dist`）；
+>    5. 显式 `git add <文件路径…>`（禁止 `git add -A`）、`git commit`、`git push origin main`（无需逐次询问，也不要打包 zip，详见 [AGENTS.md](AGENTS.md)）。
 > 3. **做角色卡联动必看**：第 3 节列出了正文联动全风格标签、世界书防全知条目与 `order`、以及小手机对台账表列的只读依赖。写角色卡时要严格对齐标签名与分隔符。
 
 ---
@@ -10,21 +15,26 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.14`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.14`（当前 HEAD `12072e8`，最初基于 `1c7ee30` 推进；功能性改动递增版本并推仓供 TT 拉取测）
+- **最低客户端版本**：`minimum_client_version: 1.13.0`（见 `manifest.json`）
+- **版本口径**：扩展分发版本只看 `manifest.json`（以及必须保持一致的 `package.json` / `package-lock.json`）。[src/UBS_phone/core/version.ts](src/UBS_phone/core/version.ts) 里的 `PHONE_VERSION = 'V1.308'` 与 `PHONE_BUILD_TAG` 只是手机内部 UI / 日志的显示锚点，不参与扩展版本判定。
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
   2. 在酒馆「扩展 → 安装扩展」粘贴本仓库地址，装好后刷新页面；同名旧脚本请先停用。
-  3. 配合统一状态栏（提供 API 预设与世界书投影协调器）及台账/数据库数据源使用；进入角色聊天后点击手机悬浮按钮使用。
-- **来源与参考**：业务原始源码源自原作者 2026-10-25 公开分享包（原作者已停更），本仓库为个人后续适配与改造维护版本，版权归属见 [SOURCE_NOTICE.md](SOURCE_NOTICE.md) 与 [src/README.md](src/README.md)。 · [简易教程](https://docs.google.com/document/d/1f5B-GmNLJExH7FE9bwpOb4Ditx5EDHfQtTIXY0WDnX4/edit)
+  3. 进入角色聊天后点击手机悬浮按钮使用。
+- **功能边界**：
+  - **独立可用**：手机壳、微信 / 电话 / 社媒 / 窥私 / 不夜城 / 游戏中心 / 商城 / 纪要 / 相机 / 相册 / 录音机 / 浏览器等 App，以及本地存储、自动备份，均可单独运行。
+  - **依赖状态栏 / 台账**：API 预设仓库、世界书投影协调、花名册只读字段、生图闸门与人物一致性 tag、一键搬家桥。对应桥不存在时这些联动降级为空操作，手机其余功能不受影响。
+- **来源与参考**：业务原始源码源自原作者 2026-10-25 公开分享包（原作者已停更）；本仓库是独立工程化（esbuild 构建、测试套件、跨仓联动）与后续迭代维护版本，版权归属见 [SOURCE_NOTICE.md](SOURCE_NOTICE.md) 与 [src/README.md](src/README.md)。 · [简易教程](https://docs.google.com/document/d/1f5B-GmNLJExH7FE9bwpOb4Ditx5EDHfQtTIXY0WDnX4/edit)
 
 ---
 
-## 2. 当前改造状态与未完成项（截至 2026-11-17）
+## 2. 当前改造状态与未完成项（截至 2026-11-25）
 
 | 模块 / 功能 | 当前状态 | 关键证据与说明 |
 |---|---|---|
-| **手机/桌面双端壳与缩放适配** | ✅ 代码+单测完成 | 桌面端缩放与移动端（`<= 600px`）解耦，修复电脑端尺寸及窗口 resize 悬浮球越界（`ff44500`）；`npm test` **23 通过 / 2 跳过**，`npm run check` 通过 |
+| **手机/桌面双端壳与缩放适配** | ✅ 代码+单测完成 | 桌面端缩放与移动端（`<= 600px`）解耦，修复电脑端尺寸及窗口 resize 悬浮球越界（`ff44500`）；当轮 `npm test` 为 23 通过 / 2 跳过（历史基线，当前计数见第 5 节），`npm run check` 通过 |
 | **台账只读消费与字段诊断** | ✅ 代码+单测完成 | 优先通过 `SeseLedgerAPI`（回落 `AutoCardUpdaterAPI`）读取表数据并登记字段契约；经历与近期亲密互动口径已对齐（[roster.ts](src/UBS_phone/core/roster.ts)、[field-contracts.ts](src/UBS_phone/core/field-contracts.ts)） |
 | **世界演化联动防轰炸（协同现状）** | ✅ 上游已修 + 本仓联动加好友 | [world-link.ts](src/UBS_phone/core/world-link.ts) 投递消息/转账红包时自动 `addFriend` 避免卡在好友申请分支；强制每轮发独立微信的问题已在状态栏 `0.1.0-alpha.4` 解除并加冷却门控 |
 | **标签剥离分层与短信/电话思考防误伤** | ✅ 代码+单测完成 | 同步 `contextKeepTags`/优先级保护与逐楼独立清洗（`readStrippedAiChatHistory`）；修复 `story-link.ts` 从 `<thinking>` 内误提 `<微信>`/`<通话>` 及 `chat-parser.ts`/`call-parser.ts` 被正文 `</think>` 误截断（`v0.1.0-alpha.4`） |
@@ -58,6 +68,10 @@
   - 贴吧：`<动态>贴吧|吧名|作者|标题|内容</动态>`
 - **内置应用结构块标签**（供小手机内部 AI 使用，见 [protocol-tags.ts](src/UBS_phone/core/protocol-tags.ts)）：`<ubp_reply>`、`<ubp_atmo>`、`<ubp_call>`、`<ubp_voicemail>`、`<ubp_spy>`、`<ubp_night>`、`<ubp_social>`、`<ubp_author>`、`<浏览器>`（`<天机阁>`/`<江湖录>`/`<贤者之镜>`）、`<商城>`（`<万宝阁>`/`<悦来商行>`/`<奇物商栈>`）。
 
+> **更新插件后必做（两步，分开验收）**：
+> 1. 在酒馆进入「扩展 → 小手机 → 设置 → 正文联动」，核对渲染正则是否齐全（含群聊互斥正则 `0009` / `0010`），缺哪条就补哪条并刷新页面——旧版正则会把这些标签整段原样显示。
+> 2. 先验**正文气泡渲染**：AI 输出一条 `<微信>…</微信>` 后，消息层应出现气泡卡；再验**手机内真群聊落库**：打开微信应看到对应会话与成员，群聊消息带发送人署名。两步不是同一件事，气泡正常不代表落库成功。
+
 ### 3.2 小手机注入角色主世界书的受管条目（前缀 `[UBS手机]`）
 
 全部通过状态栏协调器 `__ubWorldbookProjection` 写入，**角色卡勿自建 `[UBS手机]` 前缀条目**：
@@ -79,11 +93,21 @@
 
 ### 3.4 宿主窗口跨插件桥接（暴露于 `window` / `parent`）
 
-| 全局接口 | 位置 | 用途 |
-|---|---|---|
-| `window.__ubp_world_inject(events)` | [world-link.ts](src/UBS_phone/core/world-link.ts) | 接收状态栏世界演化 `<phone>` 事件（`message`/`call`/`social`）及货币正文转账/红包（`money`） |
-| `window.__ubp_phone_style()` | [world-link.ts](src/UBS_phone/core/world-link.ts) | 向状态栏回报当前聊天风格（`modern`/`xianxia`/`wuxia`/`fantasy`） |
-| `window.__ubp_toggle(force?)` / `__ubp_on_chat_changed()` | [index.ts](src/UBS_phone/index.ts) | 状态栏入口按钮切换手机面板 & 同步切聊天重绑 |
+| 全局接口 | 位置 | 方向 | 用途 |
+|---|---|---|---|
+| `window.__ubp_world_inject(events)` | [world-link.ts](src/UBS_phone/core/world-link.ts) | 状态栏 → 手机 | 接收世界演化 `<phone>` 事件（`message`/`call`/`social`）与货币正文转账/红包（`money`） |
+| `window.__ubp_phone_style()` | [world-link.ts](src/UBS_phone/core/world-link.ts) | 手机 → 状态栏 | 回报当前聊天风格（`modern`/`xianxia`/`wuxia`/`fantasy`） |
+| `window.__ubp_toggle(force?)` / `__ubp_on_chat_changed()` | [index.ts](src/UBS_phone/index.ts) | 状态栏 → 手机 | 切换手机面板 & 切聊天重绑 |
+| `window.__ubWorldbookProjection` + `ub-worldbook-projection-ready` | [message-worldbook.ts](src/UBS_phone/core/message-worldbook.ts)、[spy-worldbook.ts](src/UBS_phone/core/spy-worldbook.ts)、[host-readiness.ts](src/UBS_phone/core/host-readiness.ts) | 手机 → 状态栏 | 注册消息记录 / 窥私投影描述符；桥未就绪时等 ready 事件后再注册 |
+| `window.__ubStorageRelocation` + `ub-storage-relocation-ready` | [phone-relocation.ts](src/UBS_phone/core/phone-relocation.ts) | 手机 → 状态栏 | 一键搬家时把手机数据文件复制到新 storageId |
+| `window.__ub_currency_host` | [currency-link.ts](src/UBS_phone/core/currency-link.ts) | 状态栏 → 手机 | 货币元数据与变更通知（转账 / 红包口径） |
+| `window.__ubImageGenQueue` | [chat-images.ts](src/UBS_phone/core/chat-images.ts)、[social-images.ts](src/UBS_phone/core/social-images.ts) | 手机 → 状态栏 | 共享生图闸门：多图排队、与主项目生图互不并发 |
+| `__ubPortraitCharTags` / `__ubPortraitFanwork` / `__ubPortraitFanTags` | [chat-image-prompts.ts](src/UBS_phone/core/chat-image-prompts.ts) | 手机 → 状态栏 | 人物一致性 tag 与同人身份 tag 只读注入；桥缺失时回落散文 |
+| `window.__ub_openLightbox` | [image-lightbox.ts](src/UBS_phone/renderers/image-lightbox.ts) | 手机 → 状态栏 | 成品图点击放大走宿主三槽灯箱 |
+| `window.__ub_resetFloatBtn` | [phone-ui.ts](src/UBS_phone/renderers/phone-ui.ts) | 手机 → 状态栏 | 悬浮球「重置到屏幕中间」 |
+| 广播 `ub-phone-online` | [index.ts](src/UBS_phone/index.ts) / `unified-statusbar/core/cross-window.ts` | 手机 → 状态栏 | 手机上线通知，宿主据此探测手机桥 |
+
+> **内嵌共享件同步边界**：`src/unified-statusbar/core/`（83 个文件）是副本，其中 `env.ts` / `data-manager.ts` / `ledger-takeover.ts` / `worldbook-projection-events.ts` 为小手机定制、`external-projection-client.ts` 为伴生仓投影对接专用——禁止整目录覆盖，同步按单文件 diff 进行；改完刷新 `source-files.sha256.json` 并重建 `dist/index.js`。
 
 ---
 
@@ -91,7 +115,8 @@
 
 | 目录 / 文件 | 职责 |
 |---|---|
-| [src/UBS_phone/index.ts](src/UBS_phone/index.ts) | 扩展入口、宿主挂载、悬浮球、监听桥接注册与卸载 |
+| [index.js](index.js) / [runtime/extension.js](runtime/extension.js) / [runtime/config.js](runtime/config.js) | 扩展装载层：依赖探测、单例守卫、设置面板、`import('dist/index.js')`；`template: false` 关闭状态栏模板壳 |
+| [src/UBS_phone/index.ts](src/UBS_phone/index.ts) | 扩展入口、宿主挂载、悬浮球、桥注册与卸载、16 个 App 注册 |
 | [src/UBS_phone/core/story-link.ts](src/UBS_phone/core/story-link.ts) | 正文联动（世界书格式注入、展示正则注册、`MESSAGE_RECEIVED` 提取与 swipe 替换） |
 | [src/UBS_phone/core/world-link.ts](src/UBS_phone/core/world-link.ts) | 接收状态栏世界演化与货币系统推入的消息/来电/社媒/转账事件 |
 | [src/UBS_phone/core/chat-engine.ts](src/UBS_phone/core/chat-engine.ts) / `chat-prompts.ts` / `chat-model.ts` / `chat-parser.ts` | 微信私聊、群聊（含气氛组）、好友申请裁决引擎 |
@@ -99,21 +124,47 @@
 | [src/UBS_phone/core/roster.ts](src/UBS_phone/core/roster.ts) & [field-contracts.ts](src/UBS_phone/core/field-contracts.ts) | 台账/数据库只读缓存与字段契约自检 |
 | [src/UBS_phone/core/social-*.ts](src/UBS_phone/core/social-engine.ts) / `spy-*.ts` / `call-*.ts` / `night-*.ts` / `game-*.ts` / `browser-*.ts` / `shop-*.ts` | 朋友圈/贴吧/微博/小红书、窥私域、通话留言、不夜城、谁是卧底/狼人杀/海龟汤、幻想浏览器、网上商城引擎 |
 | [src/UBS_phone/core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) & [phone-api.ts](src/UBS_phone/core/phone-api.ts) | 手机独立设置（复用状态栏 API 预设仓库）与缩放存储 |
-| [src/UBS_phone/renderers/](src/UBS_phone/renderers/app-wechat.ts) | Shadow DOM 手机端 UI 与各 App 渲染器 |
+| [src/UBS_phone/core/chronicle.ts](src/UBS_phone/core/chronicle.ts) & [renderers/app-chronicle.ts](src/UBS_phone/renderers/app-chronicle.ts) | 纪要：从正文纪事块抽取并落库 |
+| [src/UBS_phone/core/global-search.ts](src/UBS_phone/core/global-search.ts) & [renderers/global-search-sheet.ts](src/UBS_phone/renderers/global-search-sheet.ts) | 全局搜索：跨 App 的会话 / 消息 / 联系人检索 |
+| [src/UBS_phone/core/phone-backup.ts](src/UBS_phone/core/phone-backup.ts) | 自动备份：定时打包手机数据文件 |
+| [src/UBS_phone/core/phone-storage-manager.ts](src/UBS_phone/core/phone-storage-manager.ts) & [phone-relocation.ts](src/UBS_phone/core/phone-relocation.ts) & [renderers/storage-manager-sheet.ts](src/UBS_phone/renderers/storage-manager-sheet.ts) | 存储管理、用量统计、一键搬家桥 |
+| [src/UBS_phone/renderers/app-camera.ts](src/UBS_phone/renderers/app-camera.ts) / [app-album.ts](src/UBS_phone/renderers/app-album.ts) / [app-recorder.ts](src/UBS_phone/renderers/app-recorder.ts) | 相机、相册、录音机 |
+| [src/UBS_phone/renderers/](src/UBS_phone/renderers/app-registry.ts) | Shadow DOM 手机壳、16 个 App 渲染器、弹层与共用 UI；`app-registry.ts` 为注册表 + 内部事件总线（`ubp-phone:*`） |
+
+**已注册 App（16 个）**：微信、相机、相册、录音机、浏览器、朋友圈、贴吧、微博、小红书、电话、窥私、游戏中心、不夜城、商城、纪要、设置。
 
 ---
 
 ## 5. 构建与自检命令
 
-在 `n-sese-suite/n-sese-phone` 目录下执行：
+在 `n-sese-suite/n-sese-phone` 目录下执行（Node `>=22.12.0`；CI 用 Node 24；新克隆先 `npm ci`）：
 
 ```powershell
-npm run build   # esbuild 打包 dist/index.js
+npm ci          # 按 package-lock.json 安装（新克隆 / 换 Node 版本后首次）
+npm run build   # esbuild 打包 dist/index.js（entry: src/UBS_phone/index.ts）
 npm test        # node --test tests/*.test.mjs（当前 45 通过 / 2 跳过 / 0 失败，共 47）
-npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
+npm run check   # scripts/check-release.mjs：清单一致性、入口依赖可解析、src/ SHA-256 完整性
 ```
 
-> 若修改了 `src/` 下任意文件，必须先重算 `source-files.sha256.json` 与执行 `npm run build`，否则 `npm run check` 会失败。
+> 若修改了 `src/` 下任意文件，必须先重算 `source-files.sha256.json` 中**该文件**的 SHA-256 并执行 `npm run build`，否则 `npm run check` 会失败。
+
+**2 个跳过项的固定原因**（不是失败）：
+
+- `tests/field-contracts.test.mjs` 的标准模板用例：未设置 `PHONE_STANDARD_TEMPLATE`（本仓不附完整标准模板 JSON，设置后即可执行）。
+- `tests/loader.test.mjs` 的「聊天清空后恢复状态栏壳」用例：`runtime/config.js` 中 `template: false`，小手机没有状态栏 HTML 壳可恢复。
+
+**`check-release.mjs` 的真实校验范围**（别高估它）：
+
+- **校验**：`manifest.json` 与 `package.json` 版本一致；`homePage` 指向 `github.com/<name>`；`js` 为 `index.js`；版本号格式合法；`index.js` / `runtime/extension.js` / `runtime/config.js` / `dist/index.js` / `SOURCE_NOTICE.md` / `README.md` 存在；`index.js` 的本地静态依赖能被 esbuild 解析；`dist/index.js` 非空且不含本机绝对路径；`source-files.sha256.json` 中**已登记**条目的 SHA-256 一致。
+- **不校验**：`package-lock.json` 的版本是否同步；**新增但未登记**的 `src/` 文件（只遍历清单里已有的键，不会自动发现漏登记）；`dist/index.js` 与源码是否同构——CI 另跑 `git diff --exit-code -- dist`，用「构建后无差异」间接证明。
+- 因此新增 `src/` 文件时，必须手动往 `source-files.sha256.json` 的 `files` 里补一行，否则 check 照样通过，而清单已经漏项。
+
+**更新 `source-files.sha256.json` 的方法**：只改变更条目，键为仓库相对路径（必须以 `src/` 开头、不得含 `..`），值为小写 hex SHA-256：
+
+```powershell
+(Get-FileHash -Algorithm SHA256 -LiteralPath 'src/README.md').Hash.ToLower()
+# 或：node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('src/README.md')).digest('hex'))"
+```
 
 ---
 
@@ -121,6 +172,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-26 | `0.1.0-alpha.14` (docs) | 补全并更新 README / AGENTS / SOURCE_NOTICE / src 说明（版本锚点边界、完整桥接、模块索引与交接规范），同步刷新 `src/*.md` SHA-256 清单；未改代码，不递增版本号 | 纯文档同步，`build` / `test` / `check` 复跑全绿 |
 | 2026-11-25 | `0.1.0-alpha.14` | 打通正文联动微信群聊规则与自动建群映射：[story-link.ts](src/UBS_phone/core/story-link.ts) 世界书格式条目新增四字段群聊写法 `<微信>群|群名|发送人|内容</微信>`（含 `<传讯>`/`<飞鸽>`/`<晶讯>` 别名）并配互斥渲染正则 `0009`/`0010`；新增 `resolveStoryGroupEvents` 在窥私过滤前把「目标已是群聊」或「未入通讯录的群名后缀」三字段消息自动归群，首次建出 `kind:'group'` 真群聊（规避同毫秒建群 id 碰撞）并拉齐发言/@成员与 `addFriend`；[story-link-enhance.ts](src/UBS_phone/renderers/story-link-enhance.ts) 按 `data-group` 独立成框且保留群成员署名；扩展 `tests/wechat-story-link.test.mjs` 群聊用例 | `build` / `test` 45 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-25 | `0.1.0-alpha.13` | 修复正文联动 `<微信>`/`<通话>` 主角真名在未开窥私时被吞掉的缺陷（将 `resolveStoryProtagonistEvents` 前置到 `spyEnabled` 过滤前，兼容匹配 `主角信息表.姓名` 与 `{{user}}`/`SillyTavern.name1`，且正文联动与世界演化投递消息/转账自动 `addFriend` 不再卡「未加好友申请分支」）；修复 `ensureStoryLinkInjection` 补丁匹配 `scriptName` 与 `disabled` 漏判；[app-wechat.ts](src/UBS_phone/renderers/app-wechat.ts) 移除我方消息「待发送 N 条」二次点击限制，文本/图片/语音/转账红包/相册发送即自动触发 AI 回复并在忙碌期队列接力（点「终止」清空队列）；新增 `tests/wechat-story-link.test.mjs` | `build` / `test` 44 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-19 | `0.1.0-alpha.12` | 清理 `*-prompts.ts` 8 处遗留 `after_system` 注释与 `phoneFullSlots` 内联口径对齐 | `build` / `test` 40 通过 2 跳过 / `check` 全绿；待真机验收 |

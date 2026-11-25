@@ -1,8 +1,8 @@
 {
   "sourceSnapshot": "2026-10-25",
   "files": {
-    "src/README.md": "101dd448c5b46185b0f68a924edce0293b78f49429bacb99a0b51401f0edfd92",
-    "src/UBS_phone/README.md": "73cdd2f40354e17a57b73d0b99bfafa5f4df22574f684f04f5c86f31ffdaca72",
+    "src/README.md": "3b89d80f70ed652c7295dc56f71d2898013aa9e4ca2981c1b11b15a89f9084bf",
+    "src/UBS_phone/README.md": "b0b8e52d3a53f995bc3f9b59c5a9feb53d251c8bcb47cde6464e4d2d3e628ba2",
     "src/UBS_phone/core/ai-activity-notify.ts": "a725e14ff0bd6bd2f6e41635ddf27bd9fe3dbad5701be1476e6ffa849afa78af",
     "src/UBS_phone/core/ai-activity.ts": "cd4a7d17dee60bad83397aec28dd44c0d50159efa8e7de9d0ed2955c16cf0811",
     "src/UBS_phone/core/atmosphere.ts": "024d57d581412341f2fcbc8c60847d864c120964bc4f13869fdc5cccf0ea5003",
