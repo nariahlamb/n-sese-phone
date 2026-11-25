@@ -23,6 +23,7 @@ import {
   normalizeCallRecord,
 } from './call-model';
 import {
+  addFriend,
   appendMessage,
   ensurePrivateConversation,
   makeMessageId,
@@ -598,6 +599,8 @@ export interface StoryPhoneApplyCtx {
   avatarFor?: (name: string) => string | undefined;
   /** 主角真名（正文把主角写成真名而非协议保留字「我」时按主角归一；空=不归一）。 */
   protagonistName?: string;
+  /** 额外主角真名/别名集合（如同步匹配主角信息表姓名与 {{user}}）；与 protagonistName 合并归一。 */
+  protagonistNames?: readonly string[] | ReadonlySet<string>;
   /** 窥私白名单=通讯录已知角色（含自定义联系人，排除主角）；缺省=不设门槛（仅测试/旧调用路径会省略）。 */
   knownNames?: ReadonlySet<string> | null;
 }
@@ -622,6 +625,83 @@ export function estimateCallTiming(lines: readonly StoryCallLine[]): { durationS
   return { durationSec: lines.length ? Math.min(7200, Math.max(10, t)) : 0, relSecs };
 }
 
+function collectProtagonistNameSet(
+  protagonistName?: string,
+  protagonistNames?: readonly string[] | ReadonlySet<string>,
+): Set<string> {
+  const out = new Set<string>();
+  const push = (raw: unknown) => {
+    const name = normalizePeerName(typeof raw === 'string' ? raw : '');
+    if (name && name !== '我' && name !== STORY_LINK_ME) out.add(name);
+  };
+  push(protagonistName);
+  if (protagonistNames) {
+    for (const item of protagonistNames) push(item);
+  }
+  return out;
+}
+
+/**
+ * 主角真名归一（必须在窥私总开关过滤之前执行）：
+ * 正文把主角写成真名而非保留字「我」时，正则会先归入 spy 事件；
+ * 识别并还原为正常微信/通话事件后，既不被 spyEnabled=false 吞掉，也会按正常会话落库。
+ */
+export function resolveStoryProtagonistEvents(
+  events: readonly StoryPhoneEvent[],
+  protagonistName?: string,
+  protagonistNames?: readonly string[] | ReadonlySet<string>,
+): StoryPhoneEvent[] {
+  const meSet = collectProtagonistNameSet(protagonistName, protagonistNames);
+  if (!meSet.size) return [...events];
+  const out: StoryPhoneEvent[] = [];
+  for (const event of events) {
+    if (!event.spy) {
+      out.push(event);
+      continue;
+    }
+    if (event.kind === 'message') {
+      const sender = normalizePeerName(event.name);
+      const receiver = normalizePeerName(event.peer);
+      const senderIsMe = meSet.has(sender);
+      const receiverIsMe = meSet.has(receiver);
+      if (senderIsMe && receiverIsMe) continue;
+      if (senderIsMe) {
+        if (receiver && receiver !== '我') out.push({ kind: 'message', name: STORY_LINK_ME, peer: receiver, text: event.text });
+        continue;
+      }
+      if (receiverIsMe) {
+        if (sender && sender !== '我') out.push({ kind: 'message', name: sender, text: event.text });
+        continue;
+      }
+      out.push(event);
+      continue;
+    }
+    if (event.kind === 'call') {
+      const caller = normalizePeerName(event.name);
+      const callee = normalizePeerName(event.peer);
+      const callerIsMe = meSet.has(caller);
+      const calleeIsMe = meSet.has(callee);
+      if (callerIsMe && calleeIsMe) continue;
+      if (callerIsMe) {
+        if (callee && callee !== '我') out.push({ kind: 'call', name: callee, lines: event.lines });
+        continue;
+      }
+      if (calleeIsMe) {
+        if (caller && caller !== '我') {
+          const flipped = (event.lines || []).map(line => ({
+            from: (line.from === 'me' ? 'peer' : 'me') as 'me' | 'peer',
+            text: line.text,
+          }));
+          out.push({ kind: 'call', name: caller, lines: flipped });
+        }
+        continue;
+      }
+    }
+    out.push(event);
+  }
+  return out;
+}
+
 /** 事件批应用到手机数据（纯函数直改 data；测试直接调用）。 */
 export function applyStoryPhoneEvents(
   data: PhoneChatData,
@@ -629,6 +709,7 @@ export function applyStoryPhoneEvents(
   ctx: StoryPhoneApplyCtx = {},
 ): StoryPhoneApplyOutcome[] {
   const outcomes: StoryPhoneApplyOutcome[] = [];
+  const meSet = collectProtagonistNameSet(ctx.protagonistName, ctx.protagonistNames);
   let touchedSpy = false;
   for (const event of events) {
     if (event.kind === 'message') {
@@ -637,17 +718,21 @@ export function applyStoryPhoneEvents(
         outcomes.push({ event, ok: false, reason: 'invalid-event' });
         continue;
       }
-      const me = (ctx.protagonistName || '').trim();
       let sender = normalizePeerName(event.name);
       let receiver = normalizePeerName(event.peer);
-      // 主角真名归一（仅三字段形态需要）：正文常把主角写成真名而非协议保留字「我」——
-      // 接收人=主角真名 ⇒ 角色发给主角；发送人=主角真名 ⇒ 主角发出（都退回微信路径）
-      if (event.spy && me) {
-        if (sender === me) sender = STORY_LINK_ME;
-        if (receiver === me) receiver = '';
+      // 主角真名归一（兼容直接传 extractStoryPhoneEvents 结果给 applyStoryPhoneEvents 的调用方）
+      if (event.spy && meSet.size) {
+        const senderIsMe = meSet.has(sender);
+        const receiverIsMe = meSet.has(receiver);
+        if (senderIsMe && receiverIsMe) {
+          outcomes.push({ event, ok: false, reason: 'invalid-event' });
+          continue;
+        }
+        if (senderIsMe) sender = STORY_LINK_ME;
+        if (receiverIsMe) receiver = '';
       }
       const isMe = sender === STORY_LINK_ME;
-      if (event.spy && !isMe && receiver) {
+      if (event.spy && !isMe && !meSet.has(receiver) && receiver) {
         // 真·角色间（收发双方都不是主角）→ 窥私域：同一对人=同一场；双方须为通讯录已知角色
         if (sender === receiver) {
           outcomes.push({ event, ok: false, reason: 'invalid-event' });
@@ -678,7 +763,7 @@ export function applyStoryPhoneEvents(
         outcomes.push({ event, ok: true, conversationId: conv.id });
         continue;
       }
-      if (!isMe && me && sender === me) {
+      if (!isMe && meSet.has(sender)) {
         // 两字段形态写主角真名：发送人是主角但接收人缺省，无从归属（不落库，防建出以主角为名的会话）
         outcomes.push({ event, ok: false, reason: 'invalid-event' });
         continue;
@@ -693,6 +778,7 @@ export function applyStoryPhoneEvents(
         continue;
       }
       const conv = ensurePrivateConversation(data, convName);
+      addFriend(data, convName);
       const message = normalizePhoneMessage({
         id: makeMessageId(),
         from: isMe ? 'me' : convName,
@@ -735,15 +821,34 @@ export function applyStoryPhoneEvents(
       outcomes.push({ event, ok: true, postId: post.id });
       continue;
     }
-    const name = normalizePeerName(event.name);
-    const lines = Array.isArray(event.lines) ? event.lines : [];
+    let name = normalizePeerName(event.name);
+    let lines = Array.isArray(event.lines) ? event.lines : [];
+    let callIsSpy = Boolean(event.spy);
+    let calleeNorm = normalizePeerName(event.peer);
+    if (callIsSpy && meSet.size) {
+      const callerIsMe = meSet.has(name);
+      const calleeIsMe = meSet.has(calleeNorm);
+      if (callerIsMe && calleeIsMe) {
+        outcomes.push({ event, ok: false, reason: 'invalid-event' });
+        continue;
+      }
+      if (callerIsMe) {
+        name = calleeNorm;
+        calleeNorm = '';
+        callIsSpy = false;
+      } else if (calleeIsMe) {
+        lines = lines.map(line => ({ from: line.from === 'me' ? 'peer' : 'me', text: line.text }));
+        calleeNorm = '';
+        callIsSpy = false;
+      }
+    }
     if (!name || name === '我' || !lines.length) {
       outcomes.push({ event, ok: false, reason: 'invalid-event' });
       continue;
     }
-    if (event.spy) {
+    if (callIsSpy) {
       // 角色间通话（name=拨出方、peer=接听方；lines 的 'me'=拨出方台词）→ 窥私通话记录
-      const callee = normalizePeerName(event.peer);
+      const callee = calleeNorm;
       if (!callee || callee === name) {
         outcomes.push({ event, ok: false, reason: 'invalid-event' });
         continue;
@@ -975,14 +1080,15 @@ export async function ensureStoryLinkInjection(): Promise<StoryLinkStatus> {
     if (!cur) return false;
     return String(cur.find_regex ?? cur.findRegex ?? '') !== script.findRegex
       || String(cur.replace_string ?? cur.replaceString ?? '') !== script.replaceString
-      || (cur.max_depth ?? cur.maxDepth ?? null) !== script.maxDepth;
+      || (cur.max_depth ?? cur.maxDepth ?? null) !== script.maxDepth
+      || Boolean(cur.disabled) !== script.disabled;
   });
   if (staleScripts.length) {
     const patchByName = new Map(staleScripts.map(s => [s.scriptName, s] as const));
     await th.updateTavernRegexesWith((list: any[]) => (Array.isArray(list) ? list : []).map((r: any) => {
-      const patch = patchByName.get(String(r?.script_name ?? ''));
-      // 只动我们自己的三条字段，其他脚本原样放行
-      return patch ? { ...r, find_regex: patch.findRegex, replace_string: patch.replaceString, min_depth: patch.minDepth, max_depth: patch.maxDepth } : r;
+      const patch = patchByName.get(String(r?.script_name ?? r?.scriptName ?? ''));
+      // 只动受控字段（含启用态，避免误禁后自检失效），其他脚本原样放行
+      return patch ? { ...r, find_regex: patch.findRegex, replace_string: patch.replaceString, min_depth: patch.minDepth, max_depth: patch.maxDepth, disabled: patch.disabled } : r;
     }), { type: 'global' });
   }
   // ⑧-a 社媒动态正则按**勾选集合**存在（第五轮 ⑦）：取消勾选的平台必须连脚本一起删掉——
@@ -1079,16 +1185,18 @@ export async function runStoryLinkExtraction(deps: StoryLinkListenerDeps = {}): 
   if (currentChatIsGroup()) return [];
   const floor = readLatestFloorText();
   if (!floor) return [];
-  // 窥私提取门槛=窥私总开关（关闭时不产生新数据）；旧提取条目的清理不受门槛影响（swipe 整层替换语义）
+  const roster = getRoster();
+  const me = roster.protagonistName;
+  const meNames = [me, roster.userName].map(n => (n || '').trim()).filter(n => n && n !== '我');
+  const meNameSet = new Set(meNames);
+  // 主角真名归一必须在窥私开关过滤之前：否则正文写成「角色|主角真名|内容」会被 spyEnabled=false 直接丢弃
   const spyOn = getPhoneSettings().spyEnabled;
-  const allEvents = extractStoryPhoneEvents(floor.text);
+  const allEvents = resolveStoryProtagonistEvents(extractStoryPhoneEvents(floor.text), me, meNames);
   const events = spyOn ? allEvents : allEvents.filter(e => !e.spy);
   const had = hasStoryLinkItems(readPhoneDataRef(), floor.mesId);
   if (!events.length && !had) return [];
-  const roster = getRoster();
-  const me = roster.protagonistName;
   const knownNames = new Set(
-    mergedContactNames(roster, readPhoneDataRef()?.customContacts || []).filter(n => n && n !== me),
+    mergedContactNames(roster, readPhoneDataRef()?.customContacts || []).filter(n => n && !meNameSet.has(n)),
   );
   let outcomes: StoryPhoneApplyOutcome[] = [];
   mutatePhoneData(d => {
@@ -1099,6 +1207,7 @@ export async function runStoryLinkExtraction(deps: StoryLinkListenerDeps = {}): 
         avatarFor: resolveAvatarPath,
         srcMesId: floor.mesId,
         protagonistName: me,
+        protagonistNames: meNames,
         knownNames,
       });
     }

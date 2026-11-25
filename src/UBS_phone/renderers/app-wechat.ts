@@ -1,7 +1,7 @@
 // ===== 微信 App（P0 核心交付，规格 docs/02） =====
 // 视图：sessions（会话列表）/ contacts（通讯录）/ chat（聊天详情，私聊+群聊共用）。
-// 上屏≠触发：我方消息（文字/➕面板富媒体/相册转发）先攒批，点「触发」按钮才生成
-// （批次=尾部连续我方消息，引擎内部推导）；例外=好友申请会话（发送即触发 AI 裁决）。
+// 发送即触发：我方消息（文字/➕面板富媒体/相册转发）发送后立即上屏并自动触发 AI 回复；
+// 会话忙碌期间继续发消息会队列接力；无草稿时仍可点「让对方先说」或「生成回复」手动触发。
 // 好友系统：通讯录分 好友/非好友 两栏；非好友私聊=好友申请分支（通过/拒绝 AI 裁决，
 // 拉黑后回退申请分支重新来过）。通讯录右上角「＋」可添加自定义联系人（数据库外角色，
 // 走同一申请流程；数据库收录同名后自动让位为正常角色，资料卡可删除）。群管理（改名/加减成员）
@@ -199,6 +199,8 @@ function clearDraft(convId: string): void {
   }
 }
 const _generatingConvs = new Set<string>();  // AI 生成中的会话（按会话独立，可并行聊天）
+// 会话忙碌期间用户继续发消息时暂存待续触发的附加提示，当前轮结束后自动补发一轮回复
+const _queuedAutoReplies = new Map<string, { texts: string[]; hints: string[] }>();
 let _overlay: OverlayState | null = null;
 let _groupSel = new Set<string>();
 let _groupTitle = '';
@@ -877,7 +879,7 @@ function renderChat(): void {
     : '';
   // 待发引用（仅当属本会话时呈现；切会话由 openConversation/back 清空）
   const pendingQuote = _pendingQuote && _pendingQuote.convId === conv.id ? _pendingQuote.entry : null;
-  // 输入栏右侧槽：有字=发送（上屏攒批），无字=＋（功能面板）——还原微信「＋ ⇄ 发送」双态
+  // 输入栏右侧槽：有字=发送（立即发送并自动回复），无字=＋（功能面板）——还原微信「＋ ⇄ 发送」双态
   const hasDraft = currentDraft(conv).trim().length > 0;
   // F40(十一轮)：分区串先行构建——壳整建与分区更新共用同一份字符串，杜绝两处漂移
   const extrasHtml = `
@@ -1525,12 +1527,12 @@ function takePendingQuote(): PhoneLogEntry | null {
 }
 
 /** ➕面板（微信式功能格：相册=转发现有图，拍照=描述生图，语音/转账/红包=我方富媒体）。 */
-/** 输入栏上方的生成条：还原微信输入栏后不再有独立触发钮，触发生成只剩这一个可见入口。
- *  有攒批=「待发送 N 条 › 生成回复」；无攒批=「让对方先说 ›」（保住「批次为空=让对方开口」语义）；
- *  右侧 ⋯ = 本批额外提示（原长按触发钮的入口，改常显按钮后无需长按）。 */
+/** 输入栏上方的生成条：我方消息发送即自动触发回复，不再显示「待发送 N 条」；
+ *  存在未回复的我方消息（如上次生成出错/正文联动带入）显示「生成回复」，否则「让对方先说」；
+ *  右侧 ⋯ = 本轮额外提示。 */
 function wxPendBarHtml(batchCount: number): string {
   const main = batchCount > 0
-    ? `${S(`待发送 ${batchCount} 条`, `待发出 ${batchCount} 则`)} <span class="ubp-wx-pend-arrow">›</span> ${S('生成回复', '生成回讯')}`
+    ? S('生成回复', '生成回讯')
     : S('让对方先说', '让对方先言');
   return `<div class="ubp-wx-pendbar">
     <button class="ubp-wx-pend-main" data-ubp-act="trigger">${main}</button>
@@ -1545,7 +1547,7 @@ export function inputRightSlotAct(hasDraft: boolean, isFriend: boolean): 'send' 
   return isFriend && !hasDraft ? 'plus' : 'send';
 }
 
-/** 输入栏右侧槽 markup：好友会话「＋ ⇄ 发送」双态（有字=发送上屏，无字=＋功能面板），还原微信右槽；
+/** 输入栏右侧槽 markup：好友会话「＋ ⇄ 发送」双态（有字=发送并触发回复，无字=＋功能面板），还原微信右槽；
  *  申请会话恒为发送（图标；空草稿禁用）——申请即发即触，无攒批概念，故不给 ＋。
  *  同一份 markup 供首帧渲染与输入时就地换钮（syncInputRightSlot）共用，避免两处漂移。
  *  导出供契约测试断言三种形态的 data-ubp-act / disabled / 文案。 */
@@ -2853,6 +2855,7 @@ function handleClick(event: Event): void {
     case 'mention-pick': insertMention(id); break;
     case 'abort-gen':
       if (_chatId) {
+        _queuedAutoReplies.delete(_chatId);
         _revealAbortConvs.add(_chatId);
         abortPhoneGeneration(_chatId); // 只终止本会话，别的会话生成不受影响
       }
@@ -2956,6 +2959,7 @@ function handleSelectClick(target: HTMLElement): void {
   }
   if (act === 'abort-gen') {
     if (_chatId) {
+      _queuedAutoReplies.delete(_chatId);
       _revealAbortConvs.add(_chatId);
       abortPhoneGeneration(_chatId);
     }
@@ -3082,7 +3086,7 @@ function handleKeydown(event: KeyboardEvent): void {
   if (target.id === 'ubp-chat-input' && event.key === 'Enter' && !event.shiftKey) {
     if (event.isComposing || event.keyCode === 229) return; // IME 组合中的回车=选词，不上屏
     event.preventDefault();
-    handleSend(); // 回车=只上屏（攒批），触发靠输入栏上方的「生成回复」条
+    handleSend(); // 回车=发送并立即自动触发 AI 回复
   }
 }
 
@@ -3746,9 +3750,23 @@ function appendMyMessage(convId: string, message: PhoneMessage): void {
   });
 }
 
-/** 发送=只上屏当前草稿（回车同；不触发 AI，攒批继续）。
- *  例外：好友申请会话（非好友私聊）发送即触发——申请是一次性事件，不攒批（用户拍板）。
- *  hint=长按发送带入的一次性提示（只作用于本次生成）。 */
+/** 排队或立即触发 AI 自动回复：当前空闲直接请求；忙碌中则登记待续消息与提示，本轮送达完成后自动接力。 */
+function scheduleAutoReply(convId: string, opts?: { hint?: string; text?: string }): void {
+  if (!convId) return;
+  if (isConvBusy(convId)) {
+    const entry = _queuedAutoReplies.get(convId) ?? { texts: [], hints: [] };
+    const t = (opts?.text || '').trim();
+    const h = (opts?.hint || '').trim();
+    if (t) entry.texts.push(t);
+    if (h) entry.hints.push(h);
+    _queuedAutoReplies.set(convId, entry);
+    return;
+  }
+  void runGeneration(convId, opts?.hint);
+}
+
+/** 发送=立即上屏已发送并自动触发 AI 回复。
+ *  hint=一次性额外提示（只作用于本次生成）。 */
 function handleSend(hint?: string): void {
   if (!_chatId) return;
   const text = currentDraft({ id: _chatId, draft: currentConversation()?.draft }).trim();
@@ -3761,12 +3779,10 @@ function handleSend(hint?: string): void {
   feedback('send'); // 发送「嗖」（I-3）
   clearDraft(_chatId);
   render();
-  if (!_chatIsFriend) void runGeneration(_chatId, hint);
+  scheduleAutoReply(_chatId, { hint, text });
 }
 
-/** 拍照（相机同款控件）：所选角色/地点/描述按相机口径拼成消息上屏 pending 图片。
- *  消息带所选参数（imageSubjects/imageLocationId/imageStoryCtx），生图泵按相机口径接线；
- *  时机与聊天图片一致：自动生图开→泵立即接手，关→占位点击手动生图；不触发 AI。 */
+/** 拍照（相机同款控件）：所选角色/地点/描述按相机口径拼成消息上屏图片并自动触发 AI 回复。 */
 function handleSendImage(): void {
   const desc = _imgSendDesc.trim();
   if (!desc || desc.length < 5 || !_chatId) return;
@@ -3786,9 +3802,10 @@ function handleSendImage(): void {
     ...(quote ? { quote } : {}),
   })!);
   render();
+  scheduleAutoReply(_chatId, { text: `[图片] ${desc}` });
 }
 
-/** 语音：转写文字上屏为语音条（时长按字数直算）；不触发 AI。 */
+/** 语音：转写文字上屏为语音条（时长按字数直算）并自动触发 AI 回复。 */
 function handleSendVoice(): void {
   const text = _voiceText.trim();
   if (!text || !_chatId) return;
@@ -3799,6 +3816,7 @@ function handleSendVoice(): void {
     ...(quote ? { quote } : {}),
   })!);
   render();
+  scheduleAutoReply(_chatId, { text: `[语音] ${text}` });
 }
 
 /** 转账/红包：金额清洗与 AI 输出同一口径（parseAmountNote），无效金额按钮已拦。
@@ -3826,6 +3844,7 @@ function handleSendMoney(kind: 'transfer' | 'redpacket'): void {
   })!);
   if (curMeta) payAdjust(curMeta, -Number(parsed.amount), 'phone-out', `${kind === 'redpacket' ? '红包' : '转账'} · ${convTitle}`);
   render();
+  scheduleAutoReply(_chatId, { text: kind === 'redpacket' ? '[红包]' : '[转账]' });
 }
 
 /** 拆红包（收到的未拆红包）：标记已拆 + 入账（货币联动）+ 金币迸出动效。 */
@@ -3875,6 +3894,7 @@ function handleAlbumPick(img: PickedImage): void {
   if (quote) message.quote = quote;
   appendMyMessage(_chatId, message);
   render();
+  scheduleAutoReply(_chatId, { text: `[图片] ${message.content}` });
 }
 
 /** ➕面板→相册：统一选图弹层（文生图图库/手机相册双源 + 缩略图网格 + 来源筛选）。 */
@@ -3898,7 +3918,7 @@ async function handleTrigger(hint?: string): Promise<void> {
   if (!_chatId || isConvBusy(_chatId)) return; // 只锁本会话：别的会话生成中照常可触发（并行聊天）
   if (currentDraft({ id: _chatId, draft: currentConversation()?.draft }).trim()) {
     handleSend(hint);
-    if (!_chatIsFriend) return; // handleSend 已自带触发
+    return; // handleSend 已自动触发回复
   }
   await runGeneration(_chatId, hint);
 }
@@ -4101,15 +4121,18 @@ async function commitParsedMemos(convId: string, memos: ParsedChatMemo[], owner:
 async function runGeneration(convId: string, hint?: string): Promise<void> {
   const storeState = phoneStoreStatus();
   if (storeState.state === 'read-only' || storeState.state === 'no-context' || storeState.state === 'error') {
+    _queuedAutoReplies.delete(convId);
     appendSystemMessage(convId, `[错误] 存储不可用（${storeState.error || storeState.state}），点击重试`);
     render();
     return;
   }
+  _queuedAutoReplies.delete(convId);
   _generatingConvs.add(convId);
   emitGenActivity(convId, true);
   renderConvTick(convId);
   // 聊天归属快照（F1）：请求期间用户可能切聊天/切卡；产物与错误气泡都只属于发起时那个聊天。
   const owner = currentPhoneStorageId();
+  let completedNormally = false;
   try {
     const { parsed } = await generateConversationReply({ conversationId: convId, ...(hint ? { extraHint: hint } : {}) });
     _generatingConvs.delete(convId);
@@ -4117,7 +4140,9 @@ async function runGeneration(convId: string, hint?: string): Promise<void> {
     clearErrorMessages(convId); // 本次成功 → 旧报错气泡失效，随上屏渲染一并消失
     await revealParsedMessages(convId, parsed, owner);
     await commitParsedMemos(convId, parsed.memos, owner);
+    completedNormally = true;
   } catch (error) {
+    _queuedAutoReplies.delete(convId);
     if (currentPhoneStorageId() !== owner) return; // 切走后错误气泡也不该落到新聊天
     // 统一 AI 活动「终止」= 用户主动取消：静默收口，不落错误气泡
     if (error instanceof PhoneChatError && error.kind === 'aborted') return;
@@ -4129,6 +4154,19 @@ async function runGeneration(convId: string, hint?: string): Promise<void> {
     _generatingConvs.delete(convId);
     emitGenActivity(convId, false);
     renderConvTick(convId);
+    if (completedNormally && currentPhoneStorageId() === owner && _queuedAutoReplies.has(convId)) {
+      const queued = _queuedAutoReplies.get(convId)!;
+      _queuedAutoReplies.delete(convId);
+      const convNow = findConversation(readPhoneDataRef(), convId);
+      if (convNow && !isConvBusy(convId)) {
+        const hasTailBatch = trailingUserBatch(convNow.messages).length > 0;
+        const tailHint = !hasTailBatch && queued.texts.length
+          ? `主角在你上一轮回复期间又发了新消息（${queued.texts.map(t => `「${t.slice(0, 80)}」`).join('、')}），请继续回应这些新消息`
+          : '';
+        const mergedHint = [...queued.hints, tailHint].filter(Boolean).join('\n') || undefined;
+        void runGeneration(convId, mergedHint);
+      }
+    }
   }
 }
 

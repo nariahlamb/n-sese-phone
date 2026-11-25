@@ -288,6 +288,8 @@ function readMacroUser(): string {
       const expanded = String(helper.substitudeMacros('{{user}}') || '').trim();
       if (expanded && expanded !== '{{user}}') return expanded;
     }
+    const ctxName = String(w.SillyTavern?.getContext?.()?.name1 || '').trim();
+    if (ctxName && ctxName !== '{{user}}') return ctxName;
   } catch (_e) { /* ignore */ }
   return '';
 }

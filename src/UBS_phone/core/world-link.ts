@@ -11,6 +11,7 @@ import {
   type CallRecord,
 } from './call-model';
 import {
+  addFriend,
   appendMessage,
   ensurePrivateConversation,
   makeMessageId,
@@ -202,6 +203,7 @@ export function applyWorldPhoneEvents(
     }
     if (cleaned.kind === 'message') {
       const conv = ensurePrivateConversation(data, cleaned.name);
+      addFriend(data, cleaned.name);
       appendMessage(conv, normalizePhoneMessage({
         id: makeMessageId(),
         from: cleaned.name,
@@ -218,6 +220,7 @@ export function applyWorldPhoneEvents(
       // 货币正文提取：转账/红包 → 手机消息（out=主角发出 from'me'；收到的红包 claimed=false 待拆）。
       // 记账由主扩展在提取时完成（转账即时 / 发出红包即扣款 / 收到红包拆开才入账），手机侧不重复记账。
       const conv = ensurePrivateConversation(data, cleaned.name);
+      addFriend(data, cleaned.name);
       const isOut = cleaned.direction === 'out';
       const msg = normalizePhoneMessage({
         id: makeMessageId(),
