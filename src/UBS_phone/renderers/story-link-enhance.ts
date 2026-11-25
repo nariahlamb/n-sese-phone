@@ -64,7 +64,7 @@ export const STORY_LINK_CSS = STORY_LINK_POST_CSS + `
 .ubp-sl-av:empty,.custom-ubp-sl-av:empty{display:none}
 .ubp-sl-av img,.custom-ubp-sl-av img{width:100%;height:100%;object-fit:cover;display:block}
 .ubp-sl-wx-name,.custom-ubp-sl-wx-name{font-size:11px;line-height:1.4;opacity:.55;margin:0 3px 4px}
-[data-ubp-sl-inthread] .ubp-sl-wx-name,[data-ubp-sl-inthread] .custom-ubp-sl-wx-name{display:none}
+[data-ubp-sl-inthread]:not([data-group]) .ubp-sl-wx-name,[data-ubp-sl-inthread]:not([data-group]) .custom-ubp-sl-wx-name{display:none}
 .ubp-sl-wx-bubble,.custom-ubp-sl-wx-bubble{width:fit-content;max-width:100%;padding:9px 13px;font-size:14.5px;line-height:1.6;border-radius:17px;word-break:break-word;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 2px rgba(16,24,40,.05);-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3)}
 [data-ubp-sl-theme="dark"] .ubp-sl-wx-bubble,[data-ubp-sl-theme="dark"] .custom-ubp-sl-wx-bubble{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.09);box-shadow:none}
 /* 靠右：主角（data-sender="我"）+ 角色间对话里非首位发送人（data-ubp-sl-side=right，由增强器标记） */
@@ -165,8 +165,10 @@ function slSender(el: HTMLElement): string {
   return el.getAttribute('data-sender') ?? '';
 }
 
-/** 消息类别：direct=主角参与（发给主角/主角发出）；bystander=两个非主角之间。切段据此断开。 */
-function slMsgKind(el: HTMLElement): 'direct' | 'bystander' {
+/** 消息分组键：group:<群名>=同群连续段；direct=主角参与；bystander=两个非主角之间。切段据此断开。 */
+function slMsgKind(el: HTMLElement): string {
+  const group = el.getAttribute('data-group') ?? '';
+  if (group) return `group:${group}`;
   const sender = slSender(el);
   const peer = el.getAttribute('data-peer') ?? '';
   return sender !== '我' && peer ? 'bystander' : 'direct';
@@ -215,6 +217,8 @@ interface SlThreadInfo {
  *  direct：主角参与 → 框头=对方名 + 对方头像，主角靠右（CSS 认 data-sender="我"）。
  *  bystander：两个非主角 → 全部同向时框头「A → B」且不分栏；有来有回时框头「A · B」并按发送人分左右。 */
 function slThreadInfo(run: readonly HTMLElement[]): SlThreadInfo {
+  const group = run[0].getAttribute('data-group') ?? '';
+  if (group) return { title: group };
   const kind = slMsgKind(run[0]);
   if (kind === 'direct') {
     let peer = '';

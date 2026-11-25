@@ -10,7 +10,7 @@
 ## 1. 定位与运行依赖
 
 - **扩展名称**：`瑟瑟小手机`（`manifest.json` `loading_order: 220`，在 `n-sese-unified-statusbar` `200` 与 `n-sese-ledger` `210` 之后装载）
-- **当前版本**：`0.1.0-alpha.13`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
+- **当前版本**：`0.1.0-alpha.14`（基于 `1c7ee30` 推进，功能性改动均递增版本并推仓供 TT 拉取测）
 - **全局设置存储**：服务器文件 `usb_global_phone-settings_<hash>.json`（由 [core/phone-settings.ts](src/UBS_phone/core/phone-settings.ts) 管理；API 预设仓库读取自状态栏 `customApiPresets`）；桌面端缩放键走 `localStorage['ubp_desktop_phone_zoom_v1']`。
 - **安装使用**：
   1. 先安装并启用酒馆助手（JS-Slash-Runner）。
@@ -33,6 +33,7 @@
 | **后台 AI 请求提示词与外挂世界书清洗** | ✅ 代码+单测完成 | 同步状态栏四道净化共享件（默认仅放行 `primary` 主世界书、屏蔽 `globalLore`/`additional`/`chatLore`、剔除 `role:assistant`、启用内置正文向核心词根过滤并出站剥离第三方扩展注入，同时保持 `[UBS手机]` `keepSpyRecordEntries`/`keepPhoneRecordEntries` 放行族）；[phone-raw.ts](src/UBS_phone/core/phone-raw.ts) `phoneFullSlots()` 移除 `'chat_history'`；[chat-images.ts](src/UBS_phone/core/chat-images.ts) 与 [shop-images.ts](src/UBS_phone/core/shop-images.ts) 补齐 `max_chat_history: 0`；保留楼层标签剥离不变；扩展 `tests/ai-tool-shield.test.mjs`（`0.1.0-alpha.9`–`10`） |
 | **资料块内联直传（修复无 `chat_history` 后社媒求回应及全引擎资料丢失）** | ✅ 代码+单测完成 | [phone-raw.ts](src/UBS_phone/core/phone-raw.ts) 新增 `dossier` 入参并由 `phoneFullSlots(dossier)` 直接内联为 `dialogue_examples` 与 `user_input` 之间的 `system` 槽位，`social/chat/call/spy/browser/night/shop/shop-chat` 8 个引擎全线取消失效的 `injectPrompts(after_system)`（仅保留 `position:'none'` 绿灯触发）；新增 `tests/social-feedback-dossier.test.mjs` 回归覆盖（`0.1.0-alpha.11`） |
 | **正文联动主角真名映射与微信发消息自动回复** | ✅ 代码+单测完成 | [story-link.ts](src/UBS_phone/core/story-link.ts) 将主角真名归一（同时匹配 `protagonistName` 与 `{{user}}`）前置到 `spyEnabled` 过滤前并自动 `addFriend`；修复 `ensureStoryLinkInjection` 对 `scriptName` 与 `disabled` 的漏判；[app-wechat.ts](src/UBS_phone/renderers/app-wechat.ts) 取消「待发送 N 条」攒批机制，发送文本/图片/语音/转账红包即自动触发 AI 回复并在忙碌期队列接力；新增 `tests/wechat-story-link.test.mjs`（`0.1.0-alpha.13`） |
+| **正文联动群聊规则与自动建群映射** | ✅ 代码+单测完成 | [story-link.ts](src/UBS_phone/core/story-link.ts) 新增四字段群聊协议 `<微信>群|群名|发送人|内容</微信>`（含仙侠/武侠/西幻别名与互斥渲染正则 `0009`/`0010`）及三字段群名兜底 `resolveStoryGroupEvents`（命中已有群聊或未入通讯录的常见群名后缀），提取时自动建出真 `kind:'group'` 群会话、拉齐成员并 `addFriend`；[story-link-enhance.ts](src/UBS_phone/renderers/story-link-enhance.ts) 按 `data-group` 独立成框并保留群成员署名（`0.1.0-alpha.14`） |
 | **真机回归验收** | ⏳ 待继续验证 | 正文联动气泡渲染 + 手机 TT 双开联跑 + 窥私/消息记录世界书长期运行待真机观察 |
 
 ---
@@ -45,10 +46,11 @@
 
 - **私聊 / 角色间微信标签（四风格别名永久兼容解析与渲染）**：
   - 现代 `<微信>`、仙侠 `<传讯>`、武侠 `<飞鸽>`、西幻 `<晶讯>`
-  - **严格三字段语法**（内容中禁用 `|` 与 `<`）：
+  - **私聊 / 角色间三字段语法**（内容中禁用 `|` 与 `<`）：
     - 主角发出：`<微信>我|对方角色名|内容</微信>`
     - 角色发来：`<微信>角色名|我|内容</微信>`（解析同时兼容旧两字段 `<微信>角色名|内容</微信>`）
     - 角色对角色（写进窥私域）：`<微信>发送角色名|接收角色名|内容</微信>`
+  - **群聊四字段语法**：`<微信>群|群名|发送人|内容</微信>`（主角发言写 `<微信>群|群名|我|内容</微信>`；三字段写成群名后缀或已有群名时提取侧自动兜底归群）
 - **通话块标签**：现代 `<通话>`、仙侠 `<传音>`、武侠 `<传声>`、西幻 `<远语>`，内部每行 `角色名：台词` 或 `我：台词`。
 - **社媒动态标签**：现代 `<动态>`、仙侠 `<风闻>`、武侠 `<榜帖>`、西幻 `<见闻>`
   - 朋友圈/微博：`<动态>朋友圈|作者|内容</动态>`、`<动态>微博|作者|内容</动态>`
@@ -107,7 +109,7 @@
 
 ```powershell
 npm run build   # esbuild 打包 dist/index.js
-npm test        # node --test tests/*.test.mjs（当前 44 通过 / 2 跳过 / 0 失败，共 46）
+npm test        # node --test tests/*.test.mjs（当前 45 通过 / 2 跳过 / 0 失败，共 47）
 npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 完整性校验
 ```
 
@@ -119,6 +121,7 @@ npm run check   # scripts/check-release.mjs：清单、依赖及 src/ SHA-256 �
 
 | 日期 | 版本 / Commit | 改动范围与摘要 | 验证状态 |
 |---|---|---|---|
+| 2026-11-25 | `0.1.0-alpha.14` | 打通正文联动微信群聊规则与自动建群映射：[story-link.ts](src/UBS_phone/core/story-link.ts) 世界书格式条目新增四字段群聊写法 `<微信>群|群名|发送人|内容</微信>`（含 `<传讯>`/`<飞鸽>`/`<晶讯>` 别名）并配互斥渲染正则 `0009`/`0010`；新增 `resolveStoryGroupEvents` 在窥私过滤前把「目标已是群聊」或「未入通讯录的群名后缀」三字段消息自动归群，首次建出 `kind:'group'` 真群聊（规避同毫秒建群 id 碰撞）并拉齐发言/@成员与 `addFriend`；[story-link-enhance.ts](src/UBS_phone/renderers/story-link-enhance.ts) 按 `data-group` 独立成框且保留群成员署名；扩展 `tests/wechat-story-link.test.mjs` 群聊用例 | `build` / `test` 45 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-25 | `0.1.0-alpha.13` | 修复正文联动 `<微信>`/`<通话>` 主角真名在未开窥私时被吞掉的缺陷（将 `resolveStoryProtagonistEvents` 前置到 `spyEnabled` 过滤前，兼容匹配 `主角信息表.姓名` 与 `{{user}}`/`SillyTavern.name1`，且正文联动与世界演化投递消息/转账自动 `addFriend` 不再卡「未加好友申请分支」）；修复 `ensureStoryLinkInjection` 补丁匹配 `scriptName` 与 `disabled` 漏判；[app-wechat.ts](src/UBS_phone/renderers/app-wechat.ts) 移除我方消息「待发送 N 条」二次点击限制，文本/图片/语音/转账红包/相册发送即自动触发 AI 回复并在忙碌期队列接力（点「终止」清空队列）；新增 `tests/wechat-story-link.test.mjs` | `build` / `test` 44 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |
 | 2026-11-19 | `0.1.0-alpha.12` | 清理 `*-prompts.ts` 8 处遗留 `after_system` 注释与 `phoneFullSlots` 内联口径对齐 | `build` / `test` 40 通过 2 跳过 / `check` 全绿；待真机验收 |
 | 2026-11-19 | `0.1.0-alpha.11` | 修复移除 `'chat_history'` 槽位后 `injectPrompts({ position: 'after_system' })` 资料块被宿主跳过的故障（导致社媒发帖/点赞后求回应报错「缺少『待反馈的用户互动』『现有评论』资料块」）：[phone-raw.ts](src/UBS_phone/core/phone-raw.ts) 支持将 `dossier` 直接内联为 `ordered_prompts` 中 `dialogue_examples` 与 `user_input` 之间的 `system` 槽位，全线迁移 `social-engine` / `chat-engine` / `call-engine` / `spy-engine` / `browser-engine` / `night-engine` / `shop-engine` / `shop-chat-engine` 8 个引擎（仅保留 `position:'none'` 绿灯触发）；扩展 `tests/ai-tool-shield.test.mjs` 并新增 `tests/social-feedback-dossier.test.mjs` | `build` / `test` 40 通过 2 跳过 / `check` 全绿；已推仓待 TT 拉取真机验收 |

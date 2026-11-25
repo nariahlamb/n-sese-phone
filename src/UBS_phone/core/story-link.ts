@@ -25,6 +25,7 @@ import {
 import {
   addFriend,
   appendMessage,
+  createGroupConversation,
   ensurePrivateConversation,
   makeMessageId,
   normalizePhoneMessage,
@@ -34,7 +35,7 @@ import {
 import { getTavernHelper, hostWindow } from './host-env';
 import { resolveAvatarPath } from './phone-avatars';
 import { STORY_LINK_SOCIAL_KINDS, getPhoneSettings, type StoryLinkSocialKind } from './phone-settings';
-import { mutatePhoneData, phoneStoreStatus, readPhoneDataRef } from './phone-store';
+import { currentPhoneStorageId, mutatePhoneData, phoneStoreStatus, readPhoneDataRef } from './phone-store';
 import { SOCIAL_POST_TAGS, socialPostTag } from './protocol-tags';
 import { getRoster, mergedContactNames } from './roster';
 import { ensureSpyDomain, ensureSpyPrivateConversation, pruneSpyConversations } from './spy-model';
@@ -140,7 +141,8 @@ export function storyLinkSocialKinds(): SocialPlatform[] {
 export const STORY_LINK_ENTRY_CONTENT = [
   '<正文手机格式>',
   '当剧情自然发展到微信聊天或打电话时，把内容按以下格式插进正文，其余照常叙述：',
-  '微信：<微信>发送人|接收人|内容</微信>（都写角色真名，主角写「我」）；主角发出写 <微信>我|对方角色名|内容</微信>，角色发来写 <微信>角色名|我|内容</微信>，角色发给角色写 <微信>发送角色名|接收角色名|内容</微信>（连续多条消息就写多个<微信>标签）',
+  '微信私聊：<微信>发送人|接收人|内容</微信>（都写角色真名，主角写「我」）；主角发出写 <微信>我|对方角色名|内容</微信>，角色发来写 <微信>角色名|我|内容</微信>，角色发给角色写 <微信>发送角色名|接收角色名|内容</微信>（连续多条消息就写多个<微信>标签）',
+  '微信群聊：<微信>群|群名|发送人|内容</微信>（在群里发言必须以「群|群名|」开头，发送人写角色真名或「我」，例如 <微信>群|动漫社大群|林小雨|周五别忘啦</微信>、<微信>群|动漫社大群|我|收到</微信>；不要把群名写进私聊接收人里）',
   '打电话：<通话>',
   '角色名：台词',
   '我：台词',
@@ -169,7 +171,8 @@ export function storyLinkEntryContent(style: PhoneStyle, social: readonly Social
     return [
       '<正文手机格式>',
       '当剧情自然发展到修士间传讯（玉简符讯）或神识传音时，把内容按以下格式插进正文，其余照常叙述：',
-      '传讯：<传讯>发送人|接收人|内容</传讯>（都写名字，主角写「我」）；主角发出写 <传讯>我|对方名字|内容</传讯>，对方发来写 <传讯>名字|我|内容</传讯>，修士之间写 <传讯>发送者名字|接收者名字|内容</传讯>（连续多条消息就写多个<传讯>标签）',
+      '传讯私聊：<传讯>发送人|接收人|内容</传讯>（都写名字，主角写「我」）；主角发出写 <传讯>我|对方名字|内容</传讯>，对方发来写 <传讯>名字|我|内容</传讯>，修士之间写 <传讯>发送者名字|接收者名字|内容</传讯>（连续多条消息就写多个<传讯>标签）',
+      '传讯群聊：<传讯>群|群名|发送人|内容</传讯>（多人传讯阵/群聊必须以「群|群名|」开头，主角写「我」）',
       '神识传音：<传音>',
       '角色名：台词',
       '我：台词',
@@ -184,7 +187,8 @@ export function storyLinkEntryContent(style: PhoneStyle, social: readonly Social
     return [
       '<正文手机格式>',
       '当剧情自然发展到江湖传书（飞鸽书信）或千里传声时，把内容按以下格式插进正文，其余照常叙述：',
-      '飞鸽传书：<飞鸽>发送人|接收人|内容</飞鸽>（都写名字，主角写「我」）；主角发出写 <飞鸽>我|对方名字|内容</飞鸽>，对方发来写 <飞鸽>名字|我|内容</飞鸽>，角色之间写 <飞鸽>发送者名字|接收者名字|内容</飞鸽>（连续多条消息就写多个<飞鸽>标签）',
+      '飞鸽私聊：<飞鸽>发送人|接收人|内容</飞鸽>（都写名字，主角写「我」）；主角发出写 <飞鸽>我|对方名字|内容</飞鸽>，对方发来写 <飞鸽>名字|我|内容</飞鸽>，角色之间写 <飞鸽>发送者名字|接收者名字|内容</飞鸽>（连续多条消息就写多个<飞鸽>标签）',
+      '飞鸽群聊：<飞鸽>群|群名|发送人|内容</飞鸽>（多人同盟/群书必须以「群|群名|」开头，主角写「我」）',
       '千里传声：<传声>',
       '角色名：台词',
       '我：台词',
@@ -199,7 +203,8 @@ export function storyLinkEntryContent(style: PhoneStyle, social: readonly Social
     return [
       '<正文手机格式>',
       '当剧情自然发展到水晶传讯（晶讯）或远语时，把内容按以下格式插进正文，其余照常叙述：',
-      '晶讯：<晶讯>发送人|接收人|内容</晶讯>（都写名字，主角写「我」）；主角发出写 <晶讯>我|对方名字|内容</晶讯>，对方发来写 <晶讯>名字|我|内容</晶讯>，角色之间写 <晶讯>发送者名字|接收者名字|内容</晶讯>（连续多条消息就写多个<晶讯>标签）',
+      '晶讯私聊：<晶讯>发送人|接收人|内容</晶讯>（都写名字，主角写「我」）；主角发出写 <晶讯>我|对方名字|内容</晶讯>，对方发来写 <晶讯>名字|我|内容</晶讯>，角色之间写 <晶讯>发送者名字|接收者名字|内容</晶讯>（连续多条消息就写多个<晶讯>标签）',
+      '晶讯群聊：<晶讯>群|群名|发送人|内容</晶讯>（多人晶讯频道/群聊必须以「群|群名|」开头，主角写「我」）',
       '远语：<远语>',
       '角色名：台词',
       '我：台词',
@@ -240,12 +245,17 @@ const WX_PEER_SOURCE = `${WX_OPEN}${WX_NOT_ME}${WX_NAME}\\s*[|｜]\\s*(?:我\\s*
 /** 角色发给角色（与主角无关）：<标签>发送角色名|接收角色名|内容</标签>——渲染「A → B」气泡，
  *  提取为 spy 事件落窥私域（收发双方都不是「我」；「我」在两侧都由 WX_NOT_ME 守卫排除）。 */
 const WX_NPC_SOURCE = `${WX_OPEN}${WX_NOT_ME}${WX_NAME}\\s*[|｜]\\s*${WX_NOT_ME}${WX_NAME}\\s*[|｜]\\s*${WX_CONTENT}\\s*${WX_CLOSE}`;
+/** 群聊四字段：<标签>群|群名|发送人|内容</标签>（与三字段私聊正则靠竖线数天然互斥）。 */
+const WX_GROUP_ME_SOURCE = `${WX_OPEN}群\\s*[|｜]\\s*${WX_NAME}\\s*[|｜]\\s*我\\s*[|｜]\\s*${WX_CONTENT}\\s*${WX_CLOSE}`;
+const WX_GROUP_PEER_SOURCE = `${WX_OPEN}群\\s*[|｜]\\s*${WX_NAME}\\s*[|｜]\\s*${WX_NOT_ME}${WX_NAME}\\s*[|｜]\\s*${WX_CONTENT}\\s*${WX_CLOSE}`;
 // 通话块整体捕获（对方名不再单独占行，由台词行的「角色名：」前缀推导）
 const CALL_SOURCE = '<\\s*(?:通话|传音|传声|远语)\\s*>([\\s\\S]*?)<\\s*\\/\\s*(?:通话|传音|传声|远语)\\s*>';
 
 const WX_PEER_RE = new RegExp(WX_PEER_SOURCE, 'g');
 const WX_ME_RE = new RegExp(WX_ME_SOURCE, 'g');
 const WX_NPC_RE = new RegExp(WX_NPC_SOURCE, 'g');
+const WX_GROUP_ME_RE = new RegExp(WX_GROUP_ME_SOURCE, 'g');
+const WX_GROUP_PEER_RE = new RegExp(WX_GROUP_PEER_SOURCE, 'g');
 const CALL_RE = new RegExp(CALL_SOURCE, 'g');
 
 // ─── 渲染正则脚本（酒馆 RegexScriptData 形状；placement 2=AI输出，markdownOnly=只影响显示） ───
@@ -312,6 +322,20 @@ function buildRegexScripts(social: readonly SocialPlatform[]): StoryRegexScript[
     },
     {
       ...base,
+      id: 'f3a1c2d4-0009-4a6b-9c2e-ub0000000009',
+      scriptName: `${STORY_LINK_REGEX_PREFIX}微信群聊（我方）`,
+      findRegex: `/${WX_GROUP_ME_SOURCE}/g`,
+      replaceString: '<div class="ubp-sl-wx ubp-sl-me" data-sender="我" data-group="$1"><span class="ubp-sl-av"></span><div class="ubp-sl-col"><div class="ubp-sl-wx-bubble">$2</div></div></div>',
+    },
+    {
+      ...base,
+      id: 'f3a1c2d4-0010-4a6b-9c2e-ub0000000010',
+      scriptName: `${STORY_LINK_REGEX_PREFIX}微信群聊（成员）`,
+      findRegex: `/${WX_GROUP_PEER_SOURCE}/g`,
+      replaceString: '<div class="ubp-sl-wx" data-sender="$2" data-group="$1"><span class="ubp-sl-av"></span><div class="ubp-sl-col"><span class="ubp-sl-wx-name">$2</span><div class="ubp-sl-wx-bubble">$3</div></div></div>',
+    },
+    {
+      ...base,
       id: 'f3a1c2d4-0003-4a6b-9c2e-ub0000000003',
       scriptName: `${STORY_LINK_REGEX_PREFIX}通话卡片`,
       findRegex: `/${CALL_SOURCE}/g`,
@@ -353,6 +377,8 @@ export interface StoryPhoneEvent {
   bar?: string;
   /** message：接收角色名（两字段我方/角色发给主角形态缺省）；spy 通话：接听方。 */
   peer?: string;
+  /** message：群聊名称（设值=群聊消息，按群名建群/落群）。 */
+  group?: string;
   text?: string;
   lines?: StoryCallLine[];
   /** 角色间互动（收发双方都不是主角）→ 落库目标是**窥私域**而非微信：
@@ -457,7 +483,7 @@ export function parseNpcCallBlock(body: string): { caller: string; callee: strin
 /** 事件去重键：身份与内容完全相同的条目视为「同一条」。
  *  只用来压**相邻**重复（草稿/自检抄件、AI 手滑复读）；不同方向（`我|甲` 与 `甲`）键不同，不会互相误并。 */
 function storyEventKey(event: StoryPhoneEvent): string {
-  if (event.kind === 'message') return `m|${event.name}|${event.peer ?? ''}|${event.text ?? ''}`;
+  if (event.kind === 'message') return `m|${event.group ?? ''}|${event.name}|${event.peer ?? ''}|${event.text ?? ''}`;
   if (event.kind === 'post') return `p|${event.platform ?? ''}|${event.name}|${event.bar ?? ''}|${event.title ?? ''}|${event.text ?? ''}`;
   const lines = Array.isArray(event.lines) ? event.lines : [];
   return `c|${event.name}|${event.peer ?? ''}|${lines.map(line => `${line.from}\u0001${line.text}`).join('\u0002')}`;
@@ -559,6 +585,19 @@ export function extractStoryPhoneEvents(text: string, social: readonly SocialPla
       if (!sender || !receiver || sender === receiver || !content) return null;
       return { kind: 'message', name: sender, peer: receiver, text: content, spy: true as const };
     }),
+    ...collectMatches(WX_GROUP_ME_RE, cleanText, m => {
+      const group = normalizePeerName(m[1]);
+      const content = typeof m[2] === 'string' ? m[2].trim().slice(0, TEXT_MAX) : '';
+      if (!group || !content) return null;
+      return { kind: 'message', name: STORY_LINK_ME, group, text: content };
+    }),
+    ...collectMatches(WX_GROUP_PEER_RE, cleanText, m => {
+      const group = normalizePeerName(m[1]);
+      const sender = normalizePeerName(m[2]);
+      const content = typeof m[3] === 'string' ? m[3].trim().slice(0, TEXT_MAX) : '';
+      if (!group || !sender || sender === '我' || !content) return null;
+      return { kind: 'message', name: sender, group, text: content };
+    }),
     ...collectMatches(CALL_RE, cleanText, m => {
       const body = String(m[1] ?? '');
       const npc = parseNpcCallBlock(body);
@@ -603,6 +642,8 @@ export interface StoryPhoneApplyCtx {
   protagonistNames?: readonly string[] | ReadonlySet<string>;
   /** 窥私白名单=通讯录已知角色（含自定义联系人，排除主角）；缺省=不设门槛（仅测试/旧调用路径会省略）。 */
   knownNames?: ReadonlySet<string> | null;
+  /** 所属存储槽 id（自动建群生成群会话 id 用）。 */
+  storageId?: string;
 }
 
 /** 通话方向启发：第一句台词是我方说的=主角拨出，否则=对方打来。 */
@@ -655,6 +696,15 @@ export function resolveStoryProtagonistEvents(
   if (!meSet.size) return [...events];
   const out: StoryPhoneEvent[] = [];
   for (const event of events) {
+    if (event.kind === 'message' && event.group) {
+      const sender = normalizePeerName(event.name);
+      if (sender !== STORY_LINK_ME && meSet.has(sender)) {
+        out.push({ kind: 'message', name: STORY_LINK_ME, group: event.group, text: event.text });
+      } else {
+        out.push(event);
+      }
+      continue;
+    }
     if (!event.spy) {
       out.push(event);
       continue;
@@ -702,6 +752,59 @@ export function resolveStoryProtagonistEvents(
   return out;
 }
 
+const STORY_GROUP_NAME_RE = /(?:大?群|群聊|小群|讨论组|工作群|社团群|班级群|宿舍群|后援群|交流群|内群|通知群|水群|粉丝群|车友群|家长群|业主群)$/;
+const GROUP_MENTION_RE = /@([^\s@，。,；;：:！!？?]+)/g;
+
+/**
+ * 三字段群聊兜底：当 AI 忘了写「群|群名|发送人|内容」，仍写成 `<微信>林小雨|动漫社大群|…</微信>` 和 `<微信>我|动漫社大群|…</微信>` 时，
+ * 若目标名称（1）已是现有群聊名，或（2）不在已知联系人/主角名中、未作为发送人出现、且带常见群名后缀，则整组提升为群聊事件（移除 spy 标记）。
+ */
+export function resolveStoryGroupEvents(
+  events: readonly StoryPhoneEvent[],
+  opts: {
+    existingGroupTitles?: ReadonlySet<string>;
+    knownNames?: ReadonlySet<string> | null;
+    protagonistName?: string;
+    protagonistNames?: readonly string[] | ReadonlySet<string>;
+  } = {},
+): StoryPhoneEvent[] {
+  const meSet = collectProtagonistNameSet(opts.protagonistName, opts.protagonistNames);
+  const existing = new Set<string>(opts.existingGroupTitles ?? []);
+  for (const ev of events) {
+    if (ev.kind === 'message' && ev.group) existing.add(normalizePeerName(ev.group));
+  }
+  const known = opts.knownNames ?? null;
+  const allSenders = new Set<string>();
+  const receivers = new Map<string, Set<string>>();
+  for (const ev of events) {
+    if (ev.kind !== 'message' || ev.group) continue;
+    const sender = normalizePeerName(ev.name);
+    const peer = normalizePeerName(ev.peer);
+    if (sender && sender !== STORY_LINK_ME) allSenders.add(sender);
+    if (peer) {
+      const set = receivers.get(peer) ?? new Set<string>();
+      set.add(sender);
+      receivers.set(peer, set);
+    }
+  }
+  const promoted = new Set<string>();
+  for (const target of receivers.keys()) {
+    if (!target || target === '我' || meSet.has(target)) continue;
+    if (existing.has(target)) { promoted.add(target); continue; }
+    if (known?.has(target)) continue;
+    if (!allSenders.has(target) && STORY_GROUP_NAME_RE.test(target)) {
+      promoted.add(target);
+    }
+  }
+  if (!promoted.size) return [...events];
+  return events.map(ev => {
+    if (ev.kind !== 'message' || ev.group) return ev;
+    const target = normalizePeerName(ev.peer);
+    if (!promoted.has(target)) return ev;
+    return { kind: 'message', name: ev.name, group: target, text: ev.text };
+  });
+}
+
 /** 事件批应用到手机数据（纯函数直改 data；测试直接调用）。 */
 export function applyStoryPhoneEvents(
   data: PhoneChatData,
@@ -710,9 +813,83 @@ export function applyStoryPhoneEvents(
 ): StoryPhoneApplyOutcome[] {
   const outcomes: StoryPhoneApplyOutcome[] = [];
   const meSet = collectProtagonistNameSet(ctx.protagonistName, ctx.protagonistNames);
+  const existingGroupTitles = new Set(
+    data.conversations.filter(c => c.kind === 'group').map(c => c.title.trim()).filter(Boolean),
+  );
+  const normalizedEvents = resolveStoryGroupEvents(
+    resolveStoryProtagonistEvents(events, ctx.protagonistName, ctx.protagonistNames),
+    { existingGroupTitles, knownNames: ctx.knownNames, protagonistName: ctx.protagonistName, protagonistNames: ctx.protagonistNames },
+  );
+  // 预收集本批每个群聊涉及的非主角发言人 + @到的已知联系人，确保首次建群一次拉齐成员
+  const groupMemberSeed = new Map<string, string[]>();
+  const addGroupMemberSeed = (groupTitle: string, member: string) => {
+    if (!groupTitle || !member || member === '我' || member === STORY_LINK_ME || meSet.has(member)) return;
+    const list = groupMemberSeed.get(groupTitle) ?? [];
+    if (!list.includes(member)) list.push(member);
+    groupMemberSeed.set(groupTitle, list);
+  };
+  for (const ev of normalizedEvents) {
+    if (ev.kind !== 'message' || !ev.group) continue;
+    const gTitle = normalizePeerName(ev.group);
+    const sender = normalizePeerName(ev.name);
+    addGroupMemberSeed(gTitle, sender);
+    if (ctx.knownNames?.size && typeof ev.text === 'string') {
+      GROUP_MENTION_RE.lastIndex = 0;
+      for (let mm = GROUP_MENTION_RE.exec(ev.text); mm !== null; mm = GROUP_MENTION_RE.exec(ev.text)) {
+        const mentioned = normalizePeerName(mm[1]);
+        if (ctx.knownNames.has(mentioned)) addGroupMemberSeed(gTitle, mentioned);
+      }
+    }
+  }
   let touchedSpy = false;
-  for (const event of events) {
+  for (const event of normalizedEvents) {
     if (event.kind === 'message') {
+      if (event.group) {
+        const groupTitle = normalizePeerName(event.group);
+        const rawSender = normalizePeerName(event.name);
+        const isMeGroup = rawSender === STORY_LINK_ME || meSet.has(rawSender);
+        const groupText = typeof event.text === 'string' ? event.text.trim().slice(0, TEXT_MAX) : '';
+        if (!groupTitle || (!isMeGroup && (!rawSender || rawSender === '我')) || !groupText) {
+          outcomes.push({ event, ok: false, reason: 'invalid-event' });
+          continue;
+        }
+        let conv = data.conversations.find(c => c.kind === 'group' && c.title.trim() === groupTitle) ?? null;
+        if (!conv) {
+          const seeds = groupMemberSeed.get(groupTitle) ?? [];
+          if (!seeds.length) {
+            outcomes.push({ event, ok: false, reason: 'invalid-event' });
+            continue;
+          }
+          conv = createGroupConversation(data, seeds, groupTitle, ctx.storageId || 'story');
+          let seq = 1;
+          while (data.conversations.some(c => c !== conv && c.id === conv!.id)) {
+            conv.id = `${conv.id}_${seq++}`;
+          }
+          if (ctx.srcMesId) conv.srcMesId = ctx.srcMesId;
+          for (const member of conv.members) addFriend(data, member);
+        } else if (!isMeGroup && !conv.members.includes(rawSender)) {
+          conv.members.push(rawSender);
+          addFriend(data, rawSender);
+        }
+        if (!isMeGroup) addFriend(data, rawSender);
+        const groupMsg = normalizePhoneMessage({
+          id: makeMessageId(),
+          from: isMeGroup ? 'me' : rawSender,
+          type: 'text',
+          content: groupText,
+          ts: Date.now(),
+          ...(ctx.storyTime ? { storyTime: ctx.storyTime } : {}),
+          ...(ctx.srcMesId ? { srcMesId: ctx.srcMesId } : {}),
+        });
+        if (!groupMsg) {
+          outcomes.push({ event, ok: false, reason: 'invalid-event' });
+          continue;
+        }
+        appendMessage(conv, groupMsg);
+        if (!isMeGroup) conv.unread += 1;
+        outcomes.push({ event, ok: true, conversationId: conv.id });
+        continue;
+      }
       const text = typeof event.text === 'string' ? event.text.trim().slice(0, TEXT_MAX) : '';
       if (!text) {
         outcomes.push({ event, ok: false, reason: 'invalid-event' });
@@ -1189,15 +1366,23 @@ export async function runStoryLinkExtraction(deps: StoryLinkListenerDeps = {}): 
   const me = roster.protagonistName;
   const meNames = [me, roster.userName].map(n => (n || '').trim()).filter(n => n && n !== '我');
   const meNameSet = new Set(meNames);
-  // 主角真名归一必须在窥私开关过滤之前：否则正文写成「角色|主角真名|内容」会被 spyEnabled=false 直接丢弃
-  const spyOn = getPhoneSettings().spyEnabled;
-  const allEvents = resolveStoryProtagonistEvents(extractStoryPhoneEvents(floor.text), me, meNames);
-  const events = spyOn ? allEvents : allEvents.filter(e => !e.spy);
-  const had = hasStoryLinkItems(readPhoneDataRef(), floor.mesId);
-  if (!events.length && !had) return [];
+  const curData = readPhoneDataRef();
   const knownNames = new Set(
-    mergedContactNames(roster, readPhoneDataRef()?.customContacts || []).filter(n => n && !meNameSet.has(n)),
+    mergedContactNames(roster, curData?.customContacts || []).filter(n => n && !meNameSet.has(n)),
   );
+  const existingGroupTitles = new Set(
+    (curData?.conversations || []).filter(c => c.kind === 'group').map(c => c.title.trim()).filter(Boolean),
+  );
+  // 主角真名归一与群聊识别必须在窥私开关过滤之前：否则「角色|主角真名|内容」与「角色|群名|内容」会被 spyEnabled=false 直接丢弃
+  const spyOn = getPhoneSettings().spyEnabled;
+  const allEvents = resolveStoryGroupEvents(
+    resolveStoryProtagonistEvents(extractStoryPhoneEvents(floor.text), me, meNames),
+    { existingGroupTitles, knownNames, protagonistName: me, protagonistNames: meNames },
+  );
+  const events = spyOn ? allEvents : allEvents.filter(e => !e.spy);
+  const had = hasStoryLinkItems(curData, floor.mesId);
+  if (!events.length && !had) return [];
+  const storageId = currentPhoneStorageId() || 'story';
   let outcomes: StoryPhoneApplyOutcome[] = [];
   mutatePhoneData(d => {
     removeStoryLinkItems(d, floor.mesId);
@@ -1209,6 +1394,7 @@ export async function runStoryLinkExtraction(deps: StoryLinkListenerDeps = {}): 
         protagonistName: me,
         protagonistNames: meNames,
         knownNames,
+        storageId,
       });
     }
   });

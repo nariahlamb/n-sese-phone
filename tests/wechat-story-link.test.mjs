@@ -23,8 +23,11 @@ async function loadTs(entry) {
 
 const {
   STORY_LINK_ME,
+  STORY_LINK_ENTRY_CONTENT,
+  storyLinkRegexScripts,
   extractStoryPhoneEvents,
   resolveStoryProtagonistEvents,
+  resolveStoryGroupEvents,
   applyStoryPhoneEvents,
 } = await loadTs('src/UBS_phone/core/story-link.ts');
 const { applyWorldPhoneEvents } = await loadTs('src/UBS_phone/core/world-link.ts');
@@ -314,4 +317,78 @@ test('app-wechat：发送即已发送并自动触发 AI 回复，不再显示「
     globalThis.__wechatStub = saved.__wechatStub;
     win.close();
   }
+});
+
+test('story-link：显式群聊格式与三字段群名兜底均自动建真群聊并拉齐成员、加好友', () => {
+  assert.equal(STORY_LINK_ENTRY_CONTENT.includes('<微信>群|群名|发送人|内容</微信>'), true, '格式条目应教群聊写法');
+  const scripts = storyLinkRegexScripts([]);
+  const parseRx = s => {
+    const m = /^\/(.*)\/([a-z]*)$/.exec(s.findRegex);
+    return new RegExp(m[1], m[2]);
+  };
+  const rxMe = parseRx(scripts.find(s => s.id.endsWith('0002')));
+  const rxPeer = parseRx(scripts.find(s => s.id.endsWith('0001')));
+  const rxNpc = parseRx(scripts.find(s => s.id.endsWith('0004')));
+  const rxGrpMe = parseRx(scripts.find(s => s.id.endsWith('0009')));
+  const rxGrpPeer = parseRx(scripts.find(s => s.id.endsWith('0010')));
+  const samplePeerGroup = '<微信>群|快乐老家|林小雨|晚饭吃啥</微信>';
+  const sampleMeGroup = '<微信>群|快乐老家|我|火锅走起</微信>';
+  assert.equal(rxGrpPeer.test(samplePeerGroup), true);
+  assert.equal(rxGrpMe.test(sampleMeGroup), true);
+  assert.equal(rxMe.test(sampleMeGroup) || rxPeer.test(samplePeerGroup) || rxNpc.test(samplePeerGroup), false, '四字段群聊不得与三字段私聊正则冲突');
+
+  // 1) 显式 4 字段群聊 + 主角真名写入群聊
+  const floor1 = [
+    '<微信>群|快乐老家|林小雨|晚上去吃火锅？</微信>',
+    '<微信>群|快乐老家|桃井奈奈|冲冲冲</微信>',
+    '<微信>群|快乐老家|我|记得带学生证</微信>',
+  ].join('\n');
+  const ev1 = resolveStoryProtagonistEvents(extractStoryPhoneEvents(floor1), '桃井奈奈');
+  assert.equal(ev1.every(e => !e.spy && e.group === '快乐老家'), true);
+  assert.deepEqual(ev1.map(e => e.name), ['林小雨', STORY_LINK_ME, STORY_LINK_ME]);
+
+  const data = normalizePhoneChatData({});
+  const out1 = applyStoryPhoneEvents(data, ev1, { protagonistName: '桃井奈奈', srcMesId: '30', storageId: 'testchat' });
+  assert.equal(out1.every(o => o.ok), true);
+  const g1 = data.conversations.find(c => c.kind === 'group' && c.title === '快乐老家');
+  assert(g1, '应自动建出真群聊 快乐老家');
+  assert.deepEqual(g1.members, ['林小雨']);
+  assert.equal(isFriend(data, '林小雨'), true);
+  assert.deepEqual(g1.messages.map(m => [m.from, m.content]), [
+    ['林小雨', '晚上去吃火锅？'],
+    ['me', '冲冲冲'],
+    ['me', '记得带学生证'],
+  ]);
+
+  // 2) 后续楼层 AI 漏写「群|」直接写 `陈默|快乐老家|...`，按同名群自动归入并补充陈默进成员
+  const floor2 = '<微信>陈默|快乐老家|我也来</微信>';
+  const out2 = applyStoryPhoneEvents(data, extractStoryPhoneEvents(floor2), { protagonistName: '桃井奈奈', srcMesId: '31', knownNames: new Set(['林小雨']) });
+  assert.equal(out2[0].ok, true);
+  assert.deepEqual(g1.members, ['林小雨', '陈默']);
+  assert.equal(isFriend(data, '陈默'), true);
+  assert.equal(g1.messages.at(-1)?.from, '陈默');
+
+  // 3) 首现群未写「群|」但符合真实截图形态（动漫社大群 + 多人发言，且 spyEnabled=false）
+  const floor3 = [
+    '<微信>林小雨 | 动漫社大群 | 胡说！我那是怕塑料太脆！</微信>',
+    '<微信>我 | 动漫社大群 | 知道啦知道啦，绝不跑路</微信>',
+    '<微信>陈默 | 动漫社大群 | 放心，刚才社长路过看了都说正</微信>',
+    '<微信>林小雨 | 动漫社大群 | 就是就是！周五见！</微信>',
+    '<微信>我 | 苏晚 | 晚点顺路吗</微信>',
+  ].join('\n');
+  const known = new Set(['林小雨', '陈默']);
+  const ev3 = resolveStoryGroupEvents(
+    resolveStoryProtagonistEvents(extractStoryPhoneEvents(floor3), '桃井奈奈'),
+    { knownNames: known, protagonistName: '桃井奈奈' },
+  ).filter(e => !e.spy);
+  assert.equal(ev3.length, 5, '动漫社大群三条他方消息与我方消息都不应被 spyEnabled=false 吞掉');
+  const out3 = applyStoryPhoneEvents(data, ev3, { protagonistName: '桃井奈奈', knownNames: known, srcMesId: '32', storageId: 'testchat' });
+  assert.equal(out3.every(o => o.ok), true);
+  assert.equal(data.conversations.some(c => c.id === 'p:动漫社大群'), false, '绝不应错建成 p:动漫社大群 私聊');
+  const g2 = data.conversations.find(c => c.kind === 'group' && c.title === '动漫社大群');
+  assert(g2, '应自动建出真群聊 动漫社大群');
+  assert.deepEqual(g2.members, ['林小雨', '陈默']);
+  assert.deepEqual(g2.messages.map(m => m.from), ['林小雨', 'me', '陈默', '林小雨']);
+  // 普通新人名 苏晚 不带群后缀，必须保持私聊而非误判成群
+  assert(data.conversations.some(c => c.id === 'p:苏晚' && c.kind === 'private'), '普通新角色应保持私聊会话');
 });
